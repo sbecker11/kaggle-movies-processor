@@ -4,7 +4,7 @@ import logging
 # Configure logging to print to console
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-def explore_random_sample(df, sample_size=100, columns=None):
+def explore_random_sample(df, sample_size=10, columns=None):
     """
     Randomly sample rows from the DataFrame and display column names followed by actual row data.
     The `columns` argument limits the exploration to the specified columns. If not provided, all columns are used.
@@ -32,17 +32,25 @@ def main():
     # Load the movies dataset from the provided Kaggle path
     file_path = '/Users/sbecker11/Downloads/kaggle-movie-data/movies_metadata.csv'
     try:
-        df = pd.read_csv(file_path)
+        # DtypeWarning: Columns (10) have mixed types. 
+        # Specify dtype option on import or
+        # set low_memory=False.
+        df = pd.read_csv(file_path, low_memory=False)
+
         logging.info(f"Successfully loaded data from {file_path}")
+        
+        # Output all column names
+        print("Loaded columns:", df.columns.tolist())
+
     except FileNotFoundError:
         logging.error(f"File not found: {file_path}")
         return
 
-    # Specify which columns to explore (pass None to explore all columns)
-    columns_to_explore = ['genres', 'production_companies', 'spoken_languages']
+    # Specify which columns to explore (with 'id' at the beginning)
+    columns_to_explore = ['id', 'genres', 'production_companies', 'original_language']
 
-    # Explore a random sample of 100 rows for data investigation, limited to the specified columns
-    explore_random_sample(df, sample_size=20, columns=columns_to_explore)
+    # Explore a random sample of 10 rows for data investigation, limited to the specified columns
+    explore_random_sample(df, sample_size=10, columns=columns_to_explore)
 
 if __name__ == "__main__":
     main()
