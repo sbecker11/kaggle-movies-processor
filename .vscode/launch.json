@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Process Movies File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/process-movies-file.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}
