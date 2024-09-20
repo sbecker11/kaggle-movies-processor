@@ -77,5 +77,47 @@ After all preprocessing transformatinons have been applied
 all columns, the updated dataframe is stored to the preprocessed 
 csv file named  "movies_metadata_tables_preprocessed.csv" 
 
-The next step is 
+
+After having reviewed the  movies_metadata.csv file from the zip file
+https://www.kaggle.com/rounakbanik/the-movies-dataset/version/7#movies_metadata I have 
+made some initial observations.
+
+Since one of the questions is based on genres,
+and since the generas column of the movies
+table is a json-like list of genras it seems 
+appropriate to split out one table for unique 
+generas and another many-to-many join table
+with movies on movie id.
+
+Production_companies is not relevant to any
+of the questions in part 3, so this column and
+its many-to-many relationship to movies 
+can be ignored.
+
+As for how many movies are in more than one,
+I assume that a simple count of the number
+of spoken_languages for each movie is 
+sufficient, so a separate table for unique
+languages is not required. 
+
+So, in total, I see only three tables being 
+needed to answer the questions in part 3:
+movies, genres, and movie_genres.
+
+
+SQL
+create a database, schema, and table in local postgresql service using homebrew
+
+get full list of columns using head -n 1 movie_metadata.csv
+
+use this to create a table where all columns are of type text
+
+examine the values for the release_date column
+90 have null values
+most have format "1970-07-15"
+how many do not have format '\d{4}-\d{2}-\d{2}'
+
+select count(*) from patient_iq_schema.movies 
+where release_date is not null and 
+release_date::date NOT SIMILAR TO '\d{4}-\d{2}-\d{2}';
 
