@@ -9,40 +9,62 @@ import os
 # (genres, production_companies, and languages).  
 # You will be using these tables in the next section for querying.
 
-META_MOVIES_CSV_PATH = '/Users/sbecker11/workspace-patient-iq/kaggle-movies-processor/movies_metadata.csv'
-
 load_dotenv()
 
+POSTGRES_USER = 'db_admin'
+POSTGRES_PASSWORD = os.getenv('DB_ADMIN_PASSWORD')
+POSTGRES_HOST = 'localhost'
+POSTGRES_PORT = '5432'
+POSTGRES_DB = 'patient_iq'
+CURRENT_SCHEMA = 'patient_iq_schema'
+
+META_MOVIES_CSV_PATH = '/Users/sbecker11/workspace-patient-iq/kaggle-movies-processor/movies_metadata.csv'
+
+
 def clean_and_pad_row(row):
+    """Ensure the row has at least 24 elements by padding with empty strings."""
     while len(row) < 24:
         row.append('')
     return row
 
 def table_exists(cur, table_name):
+    """Check if a table exists in the CURRENT_SCHEMA."""
     cur.execute("""
     SELECT EXISTS (
         SELECT 1
         FROM information_schema.tables 
-        WHERE table_schema = 'patient_iq_schema' 
+        WHERE table_schema = %s
         AND table_name = %s
     )
-    """, (table_name,))
+    """, (CURRENT_SCHEMA, table_name))
     return cur.fetchone()[0]
 
 
+def count_rows_in_table(cur, table_name):
+    """return the number of rows in the table in the CURRENT_SCHEMA"""
+    cur.execute(f"SELECT COUNT(*) FROM {CURRENT_SCHEMA}.{table_name}")
+    return cur.fetchone()[0]
+
 def truncate_raw_movies_table_if_exists(cur):
-    cur.execute("SELECT COUNT(*) FROM patient_iq_schema.raw_movies")
-    count = cur.fetchone()[0]
+    """truncate raw_movies table in the CURRENT_SCHEMA if it exists"""
+    
+    if not table_exists(cur, 'raw_movies'):
+        print("raw_movies table does not exist, skipping truncation.")
+        return
+    
+    count = count_rows_in_table(cur, 'raw_movies')
     print(f"Current row count in raw_movies table: {count}")
     if count > 0:
-        cur.execute("TRUNCATE TABLE patient_iq_schema.raw_movies")
+        cur.execute(f"TRUNCATE TABLE {CURRENT_SCHEMA}.raw_movies")
         print("raw_movies_table truncated.")
     else:
         print("raw_movies_table is already empty.")
 
 def create_raw_movies_table_if_not_exists(cur):
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS patient_iq_schema.raw_movies (
+    """create raw_movies table in the CURRENT_SCHEMA if it does not exist"""
+    
+    cur.execute(f"""
+    CREATE TABLE IF NOT EXISTS {CURRENT_SCHEMA}.raw_movies (
         adult TEXT,
         belongs_to_collection TEXT,
         budget TEXT,
@@ -72,9 +94,11 @@ def create_raw_movies_table_if_not_exists(cur):
     print("raw_movies_table created.")
 
 def fresh_load_raw_movies_table(cur):
+    """truncate and load raw_movies table from csv file"""
     try:
-        cur.execute("SET search_path TO patient_iq_schema, public;")
-        print("Search path set to patient_iq_schema, public before import")
+        # search path first to CURRENT_SCHEMA and if not found then public
+        cur.execute(f"SET search_path TO {CURRENT_SCHEMA}, public;")
+        print(f"Search path set to {CURRENT_SCHEMA}, public before import")
         
         # Trancate and create empty raw_movies table
         truncate_raw_movies_table_if_exists(cur)
@@ -82,8 +106,7 @@ def fresh_load_raw_movies_table(cur):
         create_raw_movies_table_if_not_exists(cur)
 
         # verify that table exists and is empty
-        cur.execute("SELECT COUNT(*) FROM patient_iq_schema.raw_movies")
-        count = cur.fetchone()[0]
+        count = count_rows_in_table(cur, 'raw_movies')
         if count == 0:
             print("raw_movies table is empty.")
         else:
@@ -100,8 +123,8 @@ def fresh_load_raw_movies_table(cur):
             print(f"CSV Headers: {headers}")
             print(f"Number of columns in CSV: {len(headers)}")
             
-            insert_query = sql.SQL("""
-                INSERT INTO patient_iq_schema.raw_movies (
+            insert_query = sql.SQL(f"""
+                INSERT INTO {CURRENT_SCHEMA}.raw_movies (
                     adult, belongs_to_collection, budget, genres, homepage, id, imdb_id,
                     original_language, original_title, overview, popularity, poster_path,
                     production_companies, production_countries, release_date, revenue,
@@ -127,8 +150,7 @@ def fresh_load_raw_movies_table(cur):
         print("attempted raw_movies table load completed.")
         
         # Check final row count
-        cur.execute("SELECT COUNT(*) FROM patient_iq_schema.raw_movies")
-        final_count = cur.fetchone()[0]
+        final_count = count_rows_in_table(cur, 'raw_movies')    
         print(f"Final row count in raw_movies table: {final_count}")
     except Exception as e:
         print(f"Error loading raw_movies data: {e}")
@@ -136,49 +158,48 @@ def fresh_load_raw_movies_table(cur):
 
 
 
-def refresh_filtered_table_and_sequence(cur, table_name, column_name):
+def fresh_create_filtered_table_and_sequence(cur, table_name, column_name):
     try:
-        # Check if the table exists before creation
-        table_existed_before = table_exists(cur, table_name)
-
-        # truncate and create genres table
-        cur.execute(f"TRUNCATE TABLE IF EXISTS patient_iq_schema.{table_name} RESTART IDENTITY CASCADE")
-        logging.info(f"{table_name} table truncated and sequence restarted.")
+        # Check if the table exists before truncating
+        if table_exists(cur, table_name):
+            cur.execute(f"TRUNCATE TABLE {CURRENT_SCHEMA}.{table_name} RESTART IDENTITY CASCADE")
+            logging.info(f"{table_name} table truncated and sequence restarted.")
+        else:
+            logging.info(f"{table_name} table does not exist, skipping truncation.")
         
+        # Create the table if it does not exist
         cur.execute(f"""
-        CREATE TABLE IF NOT EXISTS patient_iq_schema.{table_name} (
+        CREATE TABLE IF NOT EXISTS {CURRENT_SCHEMA}.{table_name} (
             id SERIAL PRIMARY KEY,
             {column_name} TEXT
         )
         """)
-        logging.info(f"{table_name} table created from column {column_name} and sequence created if needed.")
+        logging.info(f"{table_name} table and sequence created if needed.")
         
-        table_existed_after = table_exists(cur, table_name)
-
-        if not table_existed_before and table_existed_after:
+        # Check if the table was created
+        if not table_exists(cur, table_name):
             logging.info(f"{table_name} table was created.")
         else:
             logging.info(f"{table_name} table already existed.")
-
     except Exception as e:
-        logging.error(f"Error creating {table_name} table from column {column_name}: {e}")
+        logging.error(f"Error creating {table_name} table: {e}")
         raise
 
 def refresh_genres_table(cur):
-    refresh_filtered_table_and_sequence(cur, 'genres', 'genre')
+    fresh_create_filtered_table_and_sequence(cur, 'genres', 'genre')
     logging.info("genres table refreshed.")
 
 def refresh_production_companies_table(cur):
-    refresh_filtered_table_and_sequence(cur, 'production_companies', 'production_companies')
+    fresh_create_filtered_table_and_sequence(cur, 'production_companies', 'production_companies')
     logging.info("production_companies table refreshed.")
 
 def refresh_spoken_languages_table(cur):
-    refresh_filtered_table_and_sequence(cur, 'spoken_languages', 'spoken_languages')
+    fresh_create_filtered_table_and_sequence(cur, 'spoken_languages', 'spoken_languages')
     logging.info("spoken_languages table refreshed.")
 
 def main():
-    user = 'db_admin'
-    pswd = os.getenv('DB_ADMIN_PASSWORD')
+    user = POSTGRES_USER
+    pswd = POSTGRES_PASSWORD
     if not pswd:
         raise ValueError("DB_ADMIN_PASSWORD not set in .env file")
 
@@ -209,7 +230,7 @@ def main():
         refresh_spoken_languages_table(cur)
         conn.commit()
 
-        print("create filtered tables completed successfully.")
+        print("refresh filtered tables completed successfully.")
     except Exception as e:
         conn.rollback()
         print(f"An error occurred: {e}")
