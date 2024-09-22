@@ -2,10 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Process Movies File",
+            "name": "debug load raw movies",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/process-movies-file.py",
+            "cwd": "${workspaceFolder}",
+            "program": "load_raw_movies.py",
             "console": "integratedTerminal"
         }
     ]
