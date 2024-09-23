@@ -2,11 +2,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debug load raw movies",
+            "name": "debug load_movies",
             "type": "debugpy",
             "request": "launch",
             "cwd": "${workspaceFolder}",
-            "program": "load_raw_movies.py",
+            "program": "load_movies.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug regex_test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/regex_test.py",
             "console": "integratedTerminal"
         }
     ]
