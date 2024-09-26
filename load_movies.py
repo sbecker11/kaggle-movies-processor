@@ -59,25 +59,29 @@ def is_quote_wrapped_not_empty(v_str):
 def is_quote_wrapped(v_str):
     # returnr True if the given string value v_str 
     # is wrapped with matching single or double quotes
+    # return False on empty string
+    if len(v_str) == 0:
+        return False
     q = v_str[0]
     return (q in ["'", '"']) and (v_str[-1] == q)
 
 def is_quote_wrapped_not_empty(v_str):
     return len(v_str) > 0 and is_quote_wrapped(v_str)
 
-def get_double_quote_wrapped_value(v_str) :
+def unwrap_quotes(v_str): 
+    # remove all wrapping quotes until none left
+    while is_quote_wrapped_not_empty(v_str):
+        v_str = v_str[1:-1]
+    return v_str
+
+def get_double_quote_wrapped(v_str) :
     # remove all wrapping quotes until none left
     # and return the value wrapped with double quotes
-    while is_quote_wrapped(v_str):
-        v_str = v_str[1:-1]
+    v_str = unwrap_quotes(v_str)
     return f'"{v_str}"'
 
 def str_to_value(v_str):
     # convert the string value v_str to the correct type
-    # if it is a string, then ensure it is wrapped with
-    # single or double quotes
-    if is_quote_wrapped_not_empty(v_str):
-        return v_str
     if v_str == "True":
         return True
     elif v_str == "False":
@@ -86,9 +90,14 @@ def str_to_value(v_str):
         return int(v_str)
     elif re.match(r'^-?\d+(?:\.\d+)?$', v_str):
         return float(v_str)
-    logging.info(f"Value is not a string or a valid type: {v_str}")
-    return None
+    else:
+        return v_str
 
+def replace_unicodes(value):
+    return value.encode('utf-8').decode('unicode-escape')
+
+def escape_internal_quote(value):
+    return value.replace("'", "\'").replace('"', '\"')
 
 def extract_section_tuples(column_string, movie_id):
     """
@@ -120,15 +129,11 @@ def extract_section_tuples(column_string, movie_id):
     
     Raise an Exception if non-recoverale error is encountered.
     """
-    # check for valid movie_id
-    if movie_id is None:
-        raise Exception("Movie_id is None.")
-    # same for all tuples
-    movie_key_value_pair = ('movie_id', movie_id)  
     
     # Ensure column_string is a string
     if not isinstance(column_string, str) or len(column_string) == 0:
-        raise Exception(f"Column string is empty or not a string: {original_column_string}")
+        logging.info(f"Skipping empty or not a string column_string: {original_column_string}")
+        return []
 
     # ensure the column string is wrapped with square brakets
     if not column_string.startswith("[") or not column_string.endswith("]"):
@@ -141,26 +146,29 @@ def extract_section_tuples(column_string, movie_id):
     column_string = column_string.strip().strip("[]")
     
     if len(column_string) == 0:
-        raise Exception(f"Column string is empty: {original_column_string}")
+        logging.info("skipping column_string with empty content.")
+        return []
         
-    # Ensure it contains "id" and "name" keys
-    if 'id' not in column_string or 'name' not in column_string:
-        raise Exception(f"Column string does not contain 'id' and 'name' keys: {original_column_string}")
-    
-    # each curly-braced section should yield a section tuple with keys 
-    # id, name, and movie_id
+    if movie_id is None:
+        logging.info("skipping column_string with undefined movie_id.")
+        return []
+
+    # same for all tuples
+    movie_key_value_pair = ('movie_id', movie_id)  
+
+    # each valid curly-braced section should yield a valid section tuple with keys 
+    # id, name, (and then movie_id)
     all_section_tuples = []
     try:
-        # each curly-braced section is separated by a comma
+        # curly-braced sections are separated by commas
         curly_braced_sections = find_curly_braced_sections_separated_by_comma(column_string)
 
-        # extract two comma-separated key-value pairs from each curly-braced section
-        # each section should contain two key-value pairs to create a valid section_tuple
-        # Regular expression to match key-value pairs
-        pattern = re.compile(r"(['\"]?\w+['\"]?):\s*(.*)")
+        # each curly-braced section should yield a single section tuple
+        # each section tuble should initially contain 2 key-value pairs
         for curly_braced_section in curly_braced_sections:
             # e.g. curly_braced_section = {"'id': 53, 'name': 'Thr'iller'"}
             
+            # a section has two key-value pairs
             # remove wrapping curly braces
             section = curly_braced_section.strip().strip("{}")
             # e.g. section = "'id': 53, 'name': 'Thr'iller'" 
@@ -170,40 +178,52 @@ def extract_section_tuples(column_string, movie_id):
             
             key_value_pairs = []
             for part in parts:
+                # Regular expression to match one of the two key-value pair in this part
+                pattern = re.compile(r"(['\"]?\w+['\"]?):\s*(.*)")
+
                 # e.g. part = "'id': 53" or "'name': 'Thr'iller'"
                 match = pattern.match(part)
                 if match:
+                    # key="'id' value="53" 
                     key, value = match.groups()
-                    # e.g. key = "'id'", value = "53"   or key = "'name'", value = "'Thr'iller'"
+                    
+                    # key=id::str or key=name::str
+                    key = unwrap_quotes(key)
+                    if key in ["iso_639-1"]: ## special language code key
+                        key = 'id'
+                    if key not in ["id", "name"]:
+                        logging.info(f"Key is not 'id' or 'name': {key}")
+                        continue # to next part or next section
+                    # value=53::int or value=Thr'iller::str
+                    value = str_to_value(unwrap_quotes(value))
+                    if isinstance(value, str):
+                        value = replace_unicodes(value)
+                        value = escape_internal_quote(value)
+                    
+                    # e.g. key=id::str, value=53::int   or key=name::str, value=Thr'iller::str
                     key_value_pairs.append((key, value))
-                    # e.g. key_value_pairs = [("'id'", "53")] or [("'name'", "'Thr'iller'")]
+                    # e.g. key_value_pair is (id::str, 53::int) or (name::str, Thr'iller::str)
                 else:
                     logging.info(f"Part does not match pattern: {part}")
-                    continue # to the next part
+                    continue # to the next section
             # end of for part loop
+            
             if len(key_value_pairs) != 2:
                 logging.info(f"Section does not contain two key-value pairs: {curly_braced_section} so skipping.")
                 continue # skip to next section
-            # traverse both key-value pairs
-            for i in range(2):
-                key = key_value_pairs[i][0]
-                key = get_double_quote_wrapped_value(key)
-                value = key_value_pairs[i][1]
-                value = str_to_value(value)
-                if value is None:
-                    logging.info(f"Value is not a valid type: {value} so skipping")
-                    continue # skip to next section
-                key_value_pairs[i] = (key, value)
-                
-            # end of for i loop
-            if len(key_value_pairs) != 2:
-                logging.info(f"Section does not contain two valid key-value pairs: {curly_braced_section}")
-                continue # to next section
             
             # create the section_tuple from the two key_value_pars and the movie_key_value_pair
+            # e.g. section_tuple = (id::str, 53::int, name::str, Thr'iller::str, movie_id::str 123::str)
+                # check for valid movie_id
+
             section_tuple = (key_value_pairs[0], key_value_pairs[1], movie_key_value_pair)
+            if len(section_tuple) != 3:
+                logging.info(f"Section tuple does not contain 3 key-value pairs: {section_tuple}")
+                continue # skip to next section
+            
             all_section_tuples.append(section_tuple)
         # end of curly-braced sections loop
+        
         if len(all_section_tuples) == 0:
             logging.info(f"No valid section_tuples found for column string: {original_column_string}") 
             return []
