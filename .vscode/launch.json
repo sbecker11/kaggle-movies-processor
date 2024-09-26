@@ -10,10 +10,15 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "debug regex_test",
+            "name": "debug unittest load_movies_test.py",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/regex_test.py",
+            "module": "unittest",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "load_movies_test.py"
+            ],
             "console": "integratedTerminal"
         }
     ]

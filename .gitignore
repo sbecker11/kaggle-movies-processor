@@ -125,3 +125,8 @@ cython_debug/
 
 # Virtual environment
 venv/
+
+# movies csv file
+*.csv
+old/
+*.log
