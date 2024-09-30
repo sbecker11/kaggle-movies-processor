@@ -2,22 +2,22 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debug load_movies",
+            "name": "debugl cleanse_movies",
             "type": "debugpy",
             "request": "launch",
             "cwd": "${workspaceFolder}",
-            "program": "load_movies.py",
+            "program": "cleanse_movies.py",
             "console": "integratedTerminal"
         },
         {
-            "name": "debug unittest load_movies_test.py",
+            "name": "debug unittest cleanse_movies_test.py",
             "type": "debugpy",
             "request": "launch",
             "module": "unittest",
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
             "args": [
-                "load_movies_test.py"
+                "cleanse_movies_test.py"
             ],
             "console": "integratedTerminal"
         }

@@ -7,8 +7,8 @@ import logging
 from psycopg2 import sql
 from dotenv import load_dotenv
 
-from load_movies import get_columns
-from load_movies import extract_section_tuples
+from clean_movies import get_columns
+from clean_movies import extract_section_tuples
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.info("logging with basicConfi...")
