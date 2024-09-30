@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import KernelDensity
 from scipy.signal import find_peaks
@@ -8,10 +7,7 @@ from scipy.stats import gaussian_kde
 from sklearn.cluster import KMeans, MeanShift, estimate_bandwidth, DBSCAN
 
 # from statsmodels.nonparametric.smoothers_lowess import lowess 
-from sklearn.cluster import AgglomerativeClustering, SpectralClustering
-from sklearn.preprocessing import StandardScaler
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.mixture import BayesianGaussianMixture
 from sklearn.ensemble import IsolationForest
 from minisom import MiniSom
@@ -214,7 +210,7 @@ analysis_function_11 = agglomerative_clustering
 #         ax.hist(data[labels == label], bins=50, density=True, alpha=0.7, color=color, label=label_name)
 #     ax.legend()
 
-def gmm_analysis(data, ax):
+def gmm_clustering_analysis(data, ax):
     print("Analyzing data using Gaussian Mixture Model (GMM).")
     
     # Reshape data
@@ -242,7 +238,7 @@ def gmm_analysis(data, ax):
     ax.set_ylim(0, 0.5/3.25)
     ax.legend()
     
-analysis_function_12 = gmm_analysis
+analysis_function_12 = gmm_clustering_analysis
 
 # def gaussian_process_regression(data, ax):
 #     print("Analyzing data using Gaussian Process Regression.")
