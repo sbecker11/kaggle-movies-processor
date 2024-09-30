@@ -1,12 +1,8 @@
 import unittest
 import traceback
-import sys
-import re
 import psycopg2
 import os
 import logging
-import json
-import csv
 
 from psycopg2 import sql
 from dotenv import load_dotenv
