@@ -1,6 +1,9 @@
 import pandas as pd
+import numpy as np
+from scipy import stats
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-def show_column_stats(df, col):
+def show_column_stats(df, col, title=""):
     if df[col].dtype == 'object':
         print(f"Column: {col} is of type 'object'")
         print(f"  Unique Values: {df[col].unique()}")

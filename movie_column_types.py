@@ -2,52 +2,51 @@ import json
 import pandas as pd
 import re
 
-def fix_quotes_for_json(s):
-    def replace_object(match):
-        obj = match.group()
-        # Replace quotes for keys
-        obj = re.sub(r"'(\w+)':", r'"\1":', obj)
-        
-        # Replace quotes for values, preserving content
-        obj = re.sub(r': \'(.*?)\'', lambda m: f': "{m.group(1)}"', obj)
-        
-        return obj
+col_errors: dict[str, list[str]] = {}
 
-    # Pattern to match entire objects
-    pattern = r'\{[^{}]*\}'
-    
-    # Replace quotes in each object
-    result = re.sub(pattern, replace_object, s)
-    
-    # Replace outermost single quotes with square brackets
-    result = result.replace("'[", "[").replace("]'", "]")
-    
-    return result
+def save_column_error(column, error):
+    if column not in col_errors or not isinstance(col_errors[column], list):
+        col_errors[column] = []
+    col_errors[column].append(error)
 
+def fix_quotes_for_json(input_str):
+    # Escape embedded apostrophes using a Unicode escape sequence
+    # This regular expression targets single quotes that are likely part of the content
+    fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', input_str)
+    fixed_str = fixed_str.replace("'", '"')
+    try:
+        json.loads(fixed_str)
+        return fixed_str
+    except json.JSONDecodeError:
+        # If the JSON decoder fails, try to fix the quotes in the JSON string
+        # This regular expression targets single quotes that are likely part of the content
+        fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
+        try:
+            json.loads(fixed_str)
+            return fixed_str
+        except json.JSONDecodeError:
+            # If the JSON decoder fails again, return None
+            return None
+        
 def test_fix_quotes_for_json():
-    # Error: [{"id": 16, "name": "le"Animation'}] != [{"id": 16, "name": "le'Animation"}]
-    # Error: [{"id": 16, "name": "Animation with "quotes""}] != [{"id": 16, "name": "Animation with \"quotes\""}]
     errors = 0
-    case_a = "[{'id': 16, 'name': 'Animation'}]"
-    expected_a = '[{"id": 16, "name": "Animation"}]'
+    case_a =     "[{'id': 16, 'name': 'le'Animation'}, {'id': 17, 'name': 'Action'}]"
+    expected_a = '[{"id": 16, "name": "le\\u0027Animation"}, {"id": 17, "name": "Action"}]'
     result_a = fix_quotes_for_json(case_a)
-    # '[{"id": 16, "name": "Animation"}]'
     if result_a != expected_a:
         print(f"Error: {result_a} != {expected_a}")
         errors += 1
 
-    case_b = "[{'id': 16, 'name': 'le'Animation'}]"
-    expected_b = '[{"id": 16, "name": "le\'Animation"}]'
+    case_b =     "[{'id': 16, 'name': 'O'Connor'}, {'id': 17, 'name': 'Action'}]"
+    expected_b = '[{"id": 16, "name": "O\\u0027Connor"}, {"id": 17, "name": "Action"}]'
     result_b = fix_quotes_for_json(case_b)
-    # '[{"id": 16, "name": "le"Animation\'}]'
     if result_b != expected_b:
         print(f"Error: {result_b} != {expected_b}")
         errors += 1
     
-    case_c = "[{'id': 16, 'name': 'Animation with \"quotes\"'}]"
-    expected_c = '[{"id": 16, "name": "Animation with \\"quotes\\""}]'
+    case_c =     "[{'id': 16, 'name': 'Animation with \"quotes\"'}]"
+    expected_c = None
     result_c = fix_quotes_for_json(case_c)
-    # '[{"id": 16, "name": "Animation with "quotes""}]'
     if result_c != expected_c:
         print(f"Error: {result_c} != {expected_c}")
         errors += 1
@@ -354,6 +353,16 @@ column_type_extractors = {
     "date": extract_ymd_date,
     "status_categories": extract_status_categories
 }
+target_dtypes = {
+    "boolean": "bool",
+    "dict": "dict",
+    "integer": "int",
+    "list_of_dicts": "list",
+    "string": "str",
+    "float": "float",
+    "date": "datetime",
+    "status_categories": "str"
+}
 movie_column_types = {
     "adult": "boolean",
     "belongs_to_collection": "dict",
@@ -381,8 +390,51 @@ movie_column_types = {
     "vote_count": "integer"
 }
 
-# usage:
-def test_column_types(df):
+def get_movie_column_type(col):
+    return movie_column_types.get(col)
+
+def get_movie_column_extractor(col):
+    return column_type_extractors[movie_column_types.get(col)]
+
+def get_movie_column_type_extractor(movie_column_type):
+    return column_type_extractors[movie_column_type]
+
+# Function to change the data type of a column
+def change_column_dtype(df, col):
+    target_dtype = target_dtypes.get(movie_column_types.get(col))
+    if target_dtype is None:
+        print(f"Column: {col} has no target_dtype")
+        return df
+    # Ensure all non-null values match the target data type
+    if target_dtype == 'int':
+        df[col] = df[col].apply(lambda x: int(x) if pd.notna(x) else x)
+    elif target_dtype == 'float':
+        df[col] = df[col].apply(lambda x: float(x) if pd.notna(x) else x)
+    elif target_dtype == 'bool':
+        df[col] = df[col].apply(lambda x: x.strip().lower() == 'true' if pd.notna(x) else x)
+    elif target_dtype == 'str':
+        df[col] = df[col].apply(lambda x: str(x) if pd.notna(x) else x)
+    
+    # Change the data type of the column
+    df[col] = df[col].astype(target_dtype)
+    print(f"Changed data type of column: {col} to {target_dtype}")
+    return df
+
+def is_dtype_numeric(dtype):
+    return dtype in ['int', 'float']
+
+def get_columns_with_numeric_dtypes(df):
+    numeric_columns = []
+    for col in df.columns:
+        if is_dtype_numeric(df[col].dtype):
+            numeric_columns.append(col)
+    return numeric_columns
+
+# process the columns of the DataFrame
+# if fix is true, then replace invalid values with None
+# so they can be easily ignored in future processing
+
+def process_movies(df, fix=False):
     passing_columns = []
     for col in df.columns:
         if col == 'production_companies':
@@ -409,9 +461,19 @@ def test_column_types(df):
             if n > 0:
                 print(f"Column: {col} has {n} non-null values that do not match {movie_column_type}")
                 for v in non_matching_unique_values:
-                    print(f"{v} does not match {movie_column_type} for column: {col}")
-    
+                    error = f"|{v}| does not match {movie_column_type} for column: {col}"
+                    print(error)
+                    save_column_error(col, error)
+                if fix:
+                    print(f"Fixing {n} values for column: {col}")
+                    df.loc[non_matching_mask, col] = None
+            if fix:
+                change_column_dtype(df, col)
 
+    print(f"Passing columns: {passing_columns}")
+    print(f"Column errors: {col_errors}")
+    print(f"fix: {fix}")
+    
 def test_extractors():
     num_passed = 0
     num_tests = 0
@@ -460,4 +522,4 @@ if __name__ == '__main__':
     test_extractors()
     
     df = pd.read_csv("movies.csv", low_memory=False)
-    test_column_types(df)
+    process_movies(df, fix=False)

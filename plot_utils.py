@@ -1,5 +1,9 @@
 
 
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+import numpy as np
+
 # Show a matrix of histograms for pairs of numeric columns
 def show_scatter_and_density(df):
     numeric_df = df.select_dtypes(include=[np.number])
@@ -26,3 +30,25 @@ def show_scatter_and_density(df):
     fig.update_layout(height=800, width=800,
                       title_text="Scatter Plots and Density Plots")
     fig.show()
+    
+    # allow keyboard entry while figure is displayed
+    # plt.ion()
+    
+    choice = input("select 'q' to quit")
+    if choice == 'q':
+        print("Quitting...")
+        return
+
+def plot_column_distribution(df, col, title=""):
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(x=df[col], histnorm='probability density'))
+    fig.update_layout(title_text=f'{title} - Distribution of {col}')
+    fig.show()
+    
+    # allow keyboard entry while figure is displayed
+    # plt.ion()
+
+    choice = input("select 'q' to quit")
+    if choice == 'q':
+        print("Quitting...")
+        return
