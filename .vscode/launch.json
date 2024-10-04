@@ -2,7 +2,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debugl clean_movies",
+            "name": "debug movie_column_types",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "movie_column_types.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug clean_movies",
             "type": "debugpy",
             "request": "launch",
             "cwd": "${workspaceFolder}",

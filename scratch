@@ -1,0 +1,24 @@
+    print('[{"name": "Procirep", "id": 311}, \n {"name": "Constellation Productions", "id": 590},\n {"name": "France 3 Cinéma", "id": 591},\n {"name": "Claudie Ossard Productions", "id": 592},\n {"name": "Eurimages", "id": 850},\n {"name": "MEDIA Programme of the European Union", "id": 851},\n {"name": "Cofimage 5", "id": 1871},\n {"name": "Televisión Española (TVE)", "id": 6639},\n {"name": "Tele München Fernseh Produktionsgesellschaft (TMG)", "id": 7237},\n {"name": "Club d"Investissement Média", "id": 8170},\n {"name": "Canal+ España", "id": 9335},\n {"name": "Elías Querejeta Producciones Cinematográficas S.L.", "id": 12009},\n {"name": "Centre National de la Cinématographie (CNC)", "id": 18367},\n {"name": "Victoires Productions", "id": 25020},\n {"name": "Constellation", "id": 25021},\n {"name": "Lumière Pictures", "id": 25129},\n {"name": "Canal+", "id": 47532},\n {"name": "Studio Image", "id": 68517},\n {"name": "Cofimage 4", "id": 79437},\n {"name": "Ossane", "id": 79438},\n {"name": "Phoenix Images", "id": 79439}]')
+
+
+[{"name": "Procirep", "id": 311}, 
+ {"name": "Constellation Productions", "id": 590},
+ {"name": "France 3 Cinéma", "id": 591},
+ {"name": "Claudie Ossard Productions", "id": 592},
+ {"name": "Eurimages", "id": 850},
+ {"name": "MEDIA Programme of the European Union", "id": 851},
+ {"name": "Cofimage 5", "id": 1871},
+ {"name": "Televisión Española (TVE)", "id": 6639},
+ {"name": "Tele München Fernseh Produktionsgesellschaft (TMG)", "id": 7237},
+ {'name': 'Club d'Investissement Média', 'id': 8170},
+ {"name": "Canal+ España", "id": 9335},
+ {"name": "Elías Querejeta Producciones Cinematográficas S.L.", "id": 12009},
+ {"name": "Centre National de la Cinématographie (CNC)", "id": 18367},
+ {"name": "Victoires Productions", "id": 25020},
+ {"name": "Constellation", "id": 25021},
+ {"name": "Lumière Pictures", "id": 25129},
+ {"name": "Canal+", "id": 47532},
+ {"name": "Studio Image", "id": 68517},
+ {"name": "Cofimage 4", "id": 79437},
+ {"name": "Ossane", "id": 79438},
+ {"name": "Phoenix Images", "id": 79439}]

@@ -1,5 +1,4 @@
 import pandas as pd
-from dotenv import load_dotenv
 import os
 import numpy as np
 from scipy import stats
@@ -10,160 +9,17 @@ import json
 import traceback
 import ast
 
-# Load environment variables from .env file
-load_dotenv()
+from env_utils import reload_dotenv 
+ 
+reload_dotenv()
+
 
 # Read the CSV file into a Pandas DataFrame
 movies_csv_path = os.getenv('MOVIES_CSV_PATH')
 if not movies_csv_path:
     raise ValueError("MOVIES_CSV_PATH environment variable is not set")
 
-# Show a matrix of histograms for pairs of numeric columns
-def show_scatter_and_density(df):
-    numeric_df = df.select_dtypes(include=[np.number])
-    numeric_cols = numeric_df.columns
-    num_cols = len(numeric_cols)
 
-    # Create a grid layout
-    fig = make_subplots(rows=num_cols, cols=num_cols, 
-                        subplot_titles=[
-                            f'{x} vs {y}' for x in numeric_cols for y in numeric_cols],
-                        shared_xaxes=True, shared_yaxes=True)
-
-    for i, col1 in enumerate(numeric_cols):
-        for j, col2 in enumerate(numeric_cols):
-            if i == j:
-                # Add density plot on the diagonal
-                fig.add_trace(go.Histogram(
-                    x=numeric_df[col1], nbinsx=20, histnorm='probability density'), row=i + 1, col=j + 1)
-            else:
-                # Add scatter plot on the off-diagonal
-                fig.add_trace(go.Scatter(
-                    x=numeric_df[col2], y=numeric_df[col1], mode='markers'), row=i + 1, col=j + 1)
-
-    fig.update_layout(height=800, width=800,
-                      title_text="Scatter Plots and Density Plots")
-    fig.show()
-
-def show_column_stats(df, col):
-    mean = df[col].mean()
-    median = df[col].median()
-    mode = df[col].mode().iloc[0]
-    std_dev = df[col].std()
-    skew = df[col].skew()
-    kurtosis = df[col].kurtosis()
-    z_scores = np.abs(stats.zscore(df[col]))
-    min_val = df[col].min()
-    max_val = df[col].max()
-    range_val = max_val - min_val
-    variance = df[col].var()
-    iqr = df[col].quantile(0.75) - df[col].quantile(0.25)
-    missing_count = df[col].isnull().sum()
-    unique_count = df[col].nunique()
-
-    print(f"Column: {col}")
-    print(f"  Mean: {mean}")
-    print(f"  Median: {median}")
-    print(f"  Mode: {mode}")
-    print(f"  Standard Deviation: {std_dev}")
-    print(f"  Skewness: {skew}")
-    print(f"  Kurtosis: {kurtosis}")
-    print(f"  Z-scores: {z_scores}")
-    print(f"  Minimum: {min_val}")
-    print(f"  Maximum: {max_val}")
-    print(f"  Range: {range_val}")
-    print(f"  Variance: {variance}")
-    print(f"  Interquartile Range (IQR): {iqr}")
-    print(f"  Missing Values Count: {missing_count}")
-    print(f"  Unique Values Count: {unique_count}")
-
-# Compare the effect of different scalers on the data of the given numeric column in the DataFrame
-def compare_numeric_scalers(df, col, threshold=3):
-    # Step 1: Apply StandardScaler
-    standard_scaler = StandardScaler()
-    df_standard_scaled = pd.DataFrame(
-        standard_scaler.fit_transform(df), columns=df.columns)
-
-    # Step 2: Apply Clamp or Drop Outliers
-    df_standard_scaled_clamped = df_standard_scaled.clip(
-        lower=-threshold, upper=threshold)
-    df_standard_scaled_dropped = df_standard_scaled[(
-        df_standard_scaled.abs() <= 3).all(axis=1)]
-
-    # Step 3: Apply MinMaxScaler
-    min_max_scaler = MinMaxScaler()
-    df_min_max_scaled_clamped = pd.DataFrame(min_max_scaler.fit_transform(
-        df_standard_scaled_clamped), columns=df.columns)
-    df_min_max_scaled_dropped = pd.DataFrame(min_max_scaler.fit_transform(
-        df_standard_scaled_dropped), columns=df.columns)
-
-    # Print results
-    show_column_stats(df, col + ' (Original):')
-    show_column_stats(df_standard_scaled_clamped, col +
-                      " (Standard Scaled Data (Clamped):")
-    show_column_stats(df_min_max_scaled_clamped, col +
-                      " (MinMax Scaled Data (Clamped):")
-    show_column_stats(df_standard_scaled_dropped, col +
-                      " (Standard Scaled Data (Dropped):")
-    show_column_stats(df_min_max_scaled_dropped, col +
-                      " (MinMax Scaled Data (Dropped):")
-
-def is_json_parseable(value):
-    try:
-        json.loads(value)
-        return True
-    except (ValueError, TypeError):
-        return False
-
-def is_numeric(x):
-    if isinstance(x, str) and x.strip() and x.replace('.', '', 1).isdigit():
-        return True
-    return False
-
-def is_datetime(x):
-    if isinstance(x, str):
-        try:
-            pd.to_datetime(x)
-            return True
-        except ValueError:
-            return False
-    return False
-
-def is_boolean(x):
-    if isinstance(x, str):
-        return x.lower() in ['true', '1', 't', 'y', 'yes']
-    return bool(x)
-
-def is_list_with_non_empty_lists(x):
-    """
-    Check if the input is a string that can be cast to a list containing at least one non-empty list.
-
-    Parameters:
-    x (str): The input string to check.
-
-    Returns:
-    bool: True if the input can be cast to a list with at 
-    least one non-empty list, or one non-empty value, 
-    False otherwise.
-    
-    Tests:
-    print(is_list_with_non_empty_lists("[['a', 'b', 'c'], ['d', 'e', 'f']]"))  # Output: True
-    print(is_list_with_non_empty_lists("[['a']]"))  # Output: True
-    print(is_list_with_non_empty_lists("[['a'], []]"))  # Output: True
-    print(is_list_with_non_empty_lists("[]"))  # Output: False
-    print(is_list_with_non_empty_lists("[[]]"))  # Output: False
-    print(is_list_with_non_empty_lists("[[], [], []]"))  # Output: False
-    print(is_list_with_non_empty_lists("['a']"))  # Output: True
-    print(is_list_with_non_empty_lists("['a', 'b', 'c']"))  # Output: True
-    """
-    if isinstance(x, str):
-        try:
-            result = ast.literal_eval(x)
-            if isinstance(result, list) and any((isinstance(item, list) and len(item) > 0) or (not isinstance(item, list) and item) for item in result):
-                return True
-        except (ValueError, SyntaxError):
-            return False
-    return False
 
 # Apply some basic pre-cleaning steps to the raw movies data
 def pre_clean_movies(df):
@@ -180,25 +36,42 @@ def pre_clean_movies(df):
   
     return df
 
-def report_any_columns(df, skip_cols, name, apply_func):
+def report_all_columns(df, skip_cols, name, apply_func, valid_values=None):
     """
     Reports columns not already in skip_cols 
-    that contain ANY values that match the given condition
-    and then adds that reported column to the skip_cols list
+    whose non-null values all match the given condition
+    defined by the apply_func and then adds that reported 
+    column to the skip_cols list
     so it will not be reported again.
     """
     try:
-        any_name_columns = [col for col in df.columns if df[col].apply(apply_func).any() and col not in skip_cols]
-        print(f"Columns with ANY {name} values:\n{any_name_columns}")
-        for col in any_name_columns:
-            num_null = df[col].isnull().sum()
-            matching_values = df[col].apply(apply_func)
-            num_values = matching_values.sum()
-            num_non_values = df[col].apply(lambda x: not apply_func(x)).sum()
-            num_all_values = num_null + num_values + num_non_values
-            print(f"""
-Column {col} with ANY {name} values:
-number of null values: {num_null}
+        if valid_values:
+            all_name_columns = [
+                col for col in df.columns 
+                if df[col].dropna().apply(apply_func).all() 
+                  and col not in skip_cols 
+                  and df[col].dropna().astype(str).str.lower().isin(valid_values).all()
+            ]
+        else:
+            all_name_columns = [
+                col for col in df.columns 
+                if df[col].dropna().apply(apply_func).all() 
+                  and col not in skip_cols 
+                  and df[col].dropna()
+            ]
+            print(f"Columns with ALL {name} values (ignoring nulls): {all_name_columns}") 
+            for col in all_name_columns:
+                # Filter out null values
+                filtered_col = df[col].dropna()
+                matching_values = filtered_col.apply(apply_func)
+                if valid_values:
+                    num_values = filtered_col.str.lower().isin(valid_values).sum()
+                else:
+                    num_values = matching_values.sum()
+                num_non_values = (~matching_values).sum()
+                num_all_values = num_values + num_non_values
+                print(f"""
+Column {col} with ALL {name} values (ignoring nulls) and counting only valid_values:
 number of {name} values: {num_values}
 number of non-{name} values: {num_non_values}
 number of all values: {num_all_values}
@@ -217,7 +90,7 @@ number of all values: {num_all_values}
                     if len(non_null_values) >= max_view_values:
                         break
                 values_str = " ".join(non_null_values)
-                print(f"Column: {col} with ANY {name} non_null_values:\n {values_str}")
+                print(f"Column: {col} with ALL {name} non_null_values:\n {values_str}")
                 
                 # Add this col to the skip_cols list so it is not reported again
                 skip_cols.append(col)
@@ -232,18 +105,52 @@ def explore_movies(df):
     print(f"explore_movies started with number of rows: {len(df)}")   
     
     # Skip cols that have already been processed
-    # skip_cols is updated in report_any_columns as each column is processed
+    # skip_cols is updated in report_all_columns as each column is processed
     skip_cols = []
-    report_any_columns(df, skip_cols, 'boolean', is_boolean)     
-    report_any_columns(df, skip_cols, 'datetime', is_datetime)
-    report_any_columns(df, skip_cols, 'numeric', is_numeric)
-    report_any_columns(df, skip_cols, 'list', is_list_with_non_empty_lists)
-    report_any_columns(df, skip_cols, 'dict', lambda x: isinstance(x, dict))
-    report_any_columns(df, skip_cols, 'tuple', lambda x: isinstance(x, tuple))
-    report_any_columns(df, skip_cols, 'bracket', lambda x: isinstance(x, str) and x.startswith('[') and x.endswith(']'))
-    report_any_columns(df, skip_cols, 'braces', lambda x: isinstance(x, str) and x.startswith('{') and x.endswith('}'))
-    report_any_columns(df, skip_cols, 'parentheses', lambda x: isinstance(x, str) and x.startswith('(') and x.endswith(')'))
-    report_any_columns(df, skip_cols, 'angle_brackets', lambda x: isinstance(x, str) and x.startswith('<') and x.endswith('>'))
+    
+    # report_all_columns(df, skip_cols, 'boolean', is_boolean, 
+    name = 'boolean'
+    all_name_columns = []
+    
+    for col in df.columns:
+        if col in skip_cols:
+            continue
+        mapping_func = 
+        if col not in ['adult', 'original_title', 'production_companies', 'title', 'video']:
+            continue
+        # drop all null values
+        non_null_col = df[col].dropna()
+        if non_null_col.empty:
+            continue
+        # drop all non-name values
+        boolean_col = non_null_col.apply(is_boolean)
+        filtered_col = non_null_col[boolean_col]
+        if filtered_col.empty:
+            continue
+        all_unique_values = filtered_col.unique()
+        if len(all_unique_values) > 2:
+            print(f"col:{col} has more than 2 unique values {all_unique_values}")
+            continue
+        # are all remaining values name values
+        all_match_name = filtered_col.all()
+        print(f"col:{col} match {name} {all_match_name}")
+        if not all_match_name:
+            continue
+        print(f"col:{col} added to all_name_columns and skip_cols")
+        all_name_columns.append(col)
+        skip_cols.append(col)
+    print(f"Columns with ALL {name} values (ignoring nulls): {all_name_columns}")
+    
+    
+    report_all_columns(df, skip_cols, 'datetime', is_datetime)
+    report_all_columns(df, skip_cols, 'numeric', is_numeric)
+    report_all_columns(df, skip_cols, 'list', is_list_with_non_empty_lists)
+    report_all_columns(df, skip_cols, 'dict', lambda x: isinstance(x, dict))
+    report_all_columns(df, skip_cols, 'tuple', lambda x: isinstance(x, tuple))
+    report_all_columns(df, skip_cols, 'bracket', lambda x: isinstance(x, str) and x.startswith('[') and x.endswith(']'))
+    report_all_columns(df, skip_cols, 'braces', lambda x: isinstance(x, str) and x.startswith('{') and x.endswith('}'))
+    report_all_columns(df, skip_cols, 'parentheses', lambda x: isinstance(x, str) and x.startswith('(') and x.endswith(')'))
+    report_all_columns(df, skip_cols, 'angle_brackets', lambda x: isinstance(x, str) and x.startswith('<') and x.endswith('>'))
 
     # See if remaining (non-skip-cols) include any object columns
     categorical_columns = [col for col in df.select_dtypes(include=['object']).columns if col not in skip_cols]
@@ -277,10 +184,13 @@ def clean_movies(df, movies_outputs_path):
 
     # Convert columns to appropriate data types
     for col in df.select_dtypes(include=['bool']):
+        print(f"mapping col:{col} to bool")
         df[col] = df[col].map(lambda x: x == 'True')
     for col in df.select_dtypes(include=['datetime']):
+        print(f"mapping col:{col} to datetime")
         df[col] = pd.to_datetime(df[col])
     for col in df.select_dtypes(include=['number']):
+        print(f"mapping col:{col} to number")
         df[col] = pd.to_numeric(df[col], errors='coerce')
 
     # Find categorical columns
@@ -352,6 +262,8 @@ def clean_movies(df, movies_outputs_path):
     # Return the cleansed df for further investigation
     return df
 
+
+
 if __name__ == '__main__':
     movies_csv_file = os.getenv('MOVIES_CSV_PATH')
     if not movies_csv_file:
@@ -363,7 +275,7 @@ if __name__ == '__main__':
 
     pre_cleaned_parquet = os.path.join(movie_outputs_path, "pre_cleaned.parquet")
     all_cleaned_parquet = os.path.join(movie_outputs_path, "all_cleaned.parquet")
-    
+        
     if os.path.exists(pre_cleaned_parquet):
         print(f"Reading from {pre_cleaned_parquet}")
         df = pd.read_parquet(pre_cleaned_parquet)

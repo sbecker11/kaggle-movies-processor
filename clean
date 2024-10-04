@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from clean_movies import get_columns
 from clean_movies import extract_section_tuples
 
+import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.info("logging with basicConfi...")
 
