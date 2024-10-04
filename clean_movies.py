@@ -1,25 +1,16 @@
 import pandas as pd
 import os
-from movie_column_types import process_movies, get_movie_column_type, get_movie_column_type_extractor, get_columns_with_numeric_dtypes
+from movie_column_types import process_movie_columns, get_movie_column_type, get_movie_column_type_extractor, get_columns_with_numeric_dtypes
 from stats_utils import show_column_stats
-from plot_utils import show_scatter_and_density, plot_column_distribution
-
-
+from plot_utils import plot_column_distribution
 from sklearn.preprocessing import StandardScaler
-
-
 from env_utils import reload_dotenv 
  
 reload_dotenv()
 
-
-# Read the CSV file into a Pandas DataFrame
-movies_csv_path = os.getenv('MOVIES_CSV_PATH')
-if not movies_csv_path:
-    raise ValueError("MOVIES_CSV_PATH environment variable is not set")
-
 # Apply some basic pre-cleaning steps to the raw movies data
 def pre_clean_movies(df):
+    
     # Drop duplicate rows
     num_duplicates = df.duplicated().sum()
     if num_duplicates > 0:
@@ -31,75 +22,78 @@ def pre_clean_movies(df):
     print(f"Dropping blank columns: {blank_columns}")
     df = df.drop(columns=blank_columns)
   
-    return df
-
-
-def explore_movies(df):
-    # Reports data statistics without modifying the DataFrame 
-    # Assume df has already been cleaned
-    
-    print(f"explore_movies started with number of rows: {len(df)}")   
-    process_movies(df, fix=False)
-    
-    numeric_columns = get_columns_with_numeric_dtypes(df)
-    choice = input(f"show scatter and density plots for all {len(numeric_columns)} numeric columns (y/n): ")
-    if choice == 'y':
-        show_scatter_and_density(df[numeric_columns], title=f"Scatter and Density plots for {len(numeric_columns)} numeric columns")
-
-    print(f"explore_movies finished with number of rows: {len(df)}")   
-
-def clean_movies(df, movies_outputs_path):
-    
-    # Returns the cleaned DataFrame
-    print(f"clean_movies started with number of rows: {len(df)}")   
-
     # Drop columns with more than 50% missing values
     missing_threshold = 0.5 * len(df)
     missing_columns = df.columns[df.isnull().sum() > missing_threshold] 
     print(f"Dropping columns with more than 50% missing values: {missing_columns}") 
     df = df.drop(columns=missing_columns)
 
-    df = process_movies(df, fix=True)
+    return df
+
+
+def explore_movies(df, title=""):
     
-    numeric_columns = get_columns_with_numeric_dtypes(df)
-    title = f"scatter and density plots for all {len(numeric_columns)} numeric columns"
-    choice = input(f"show {title} before auto-scaling (y/n):")
-    if choice == 'y':
-        show_scatter_and_density(df[numeric_columns], title=f"{title} before auto-scaling")
-
-    df = auto_scale_numeric_columns(df)
+    # Reports data statistics without modifying the DataFrame 
+    # Assume df has already been pre-cleaned
     
-    choice = input(f"show {title} after auto-scaling (y/n):")
-    if choice == 'y':
-        show_scatter_and_density(df[numeric_columns], title=f"{title} after auto-scaling")
+    print(f"explore_movies started with rows: {len(df)} columns: {len(df.columns)} {title}")   
 
+    process_movie_columns(df, fix=False)
+    
+    ddf = df.copy()
+    
+    ddf = autoscale_numeric_columns(ddf, verbose=True)
+    
+    print(f"explore_movies finished with rows: {len(df)} columns: {len(df.columns)} {title}")   
 
-    print(f"clean_movies finished with number of rows: {len(df)}")   
+def clean_movies(df):
+    # The mother cleaner function that applies all the cleaning functions
+    # and returns the cleaned DataFrame
+    
+    print(f"clean_movies started with rows: {len(df)} columns: {len(df.columns)}")   
+
+    # for each common column type, apply the appropriate cleaning function
+    # for example, if each value in a column is defined as a float,
+    # then the cleansing funcion will convert each value to a float
+    # or None if conversion is not possible, for example if the value
+    # is a string that cannot be converted to a float.
+    df = process_movie_columns(df, fix=True)
+    
+    df = autoscale_numeric_columns(df, verbose=True)
+    
+    print(f"clean_movies finished with rows: {len(df)} columns: {len(df.columns)}")   
 
     # Return the cleansed df for further investigation
     return df
 
-def auto_scale_numeric_columns(df):
-    for col in df.columns:
-        if get_movie_column_type(col) in ['float', 'integer']:
-            df = scale_valid_values(df, col)
+def autoscale_numeric_columns(df, verbose=False):
+    numeric_columns = get_columns_with_numeric_dtypes(df)
+    for col in numeric_columns:
+        df = autoscale_numeric_column(df, col, verbose=verbose)            
     return df
 
-def column_type_matcher(x, column_type_extractor):
-    return column_type_extractor(x) is not None
-
-def scale_valid_values(df, col, show_plots=False):
+def autoscale_numeric_column(df, col, verbose=False):
+    # use the column type extractor to identify valid values
+    # apply StandardScaler to the valid values
+    # reinsert the scaled values back into the DataFrame
+    # return the DataFrame with the scaled column
+    # includes option to show stats and distribution
+    # before and after scaling
     
-    if show_plots:
-        show_column_stats(df, col, title="Before scaling")
-        plot_column_distribution(df, col, title="Before scaling")
+    if verbose:
+        title = "Column:{col} before scaling"
+        show_column_stats(df, col, title=title)
+        plot_column_distribution(df, col, title=title)
 
-        
     # Get the column type extractor
     column_type_extractor = get_movie_column_type_extractor(col)
     
+    # Create a column type matcher which retuns a valid value or None
+    def column_type_matcher(x):
+        return column_type_extractor(x) is not None
+    
     # Create a mask for valid values
-    value_mask = df[col].dropna().apply(lambda x: column_type_matcher(x, column_type_extractor))
+    value_mask = df[col].dropna().apply(lambda x: column_type_matcher(x))
     
     # Extract valid values
     valid_values = df[col].dropna()[value_mask]
@@ -111,28 +105,32 @@ def scale_valid_values(df, col, show_plots=False):
     # Reinsert scaled values back into the DataFrame
     df.loc[valid_values.index, col] = scaled_values
     
-    if show_plots:
-        show_column_stats(df, col, title="After scaling")
-        plot_column_distribution(df, col, title="After scaling")
+    if verbose:
+        title = "Column:{col} after scaling"
+        show_column_stats(df, col, title=title)
+        plot_column_distribution(df, col, title=title)
 
+    # return the DataFrame with the scaled column
     return df
     
 
 if __name__ == '__main__':
+    # Read the CSV file into a Pandas DataFrame
     movies_csv_file = os.getenv('MOVIES_CSV_PATH')
     if not movies_csv_file:
         raise ValueError("MOVIES_CSV_PATH environment variable is not set")
 
+    # the cleaned data goes here
     movie_outputs_path = os.getenv('MOVIES_OUTPUTS_PATH')
     if not movie_outputs_path:
         raise ValueError("MOVIES_OUTPUTS_PATH environment variable is not set")
 
-    pre_cleaned_parquet = os.path.join(movie_outputs_path, "pre_cleaned.parquet")
-    all_cleaned_parquet = os.path.join(movie_outputs_path, "all_cleaned.parquet")
+    pre_cleaned_parquet_path = os.path.join(movie_outputs_path, "pre_cleaned.parquet")
+    all_cleaned_csv_path = os.path.join(movie_outputs_path, "all_cleaned.csv")
         
-    if os.path.exists(pre_cleaned_parquet):
-        print(f"Reading from {pre_cleaned_parquet}")
-        df = pd.read_parquet(pre_cleaned_parquet)
+    if os.path.exists(pre_cleaned_parquet_path):
+        print(f"Reading from {pre_cleaned_parquet_path}")
+        df = pd.read_parquet(pre_cleaned_parquet_path)
     else:
         print(f"Reading from {movies_csv_file} forcing dtype=str")
         df = pd.read_csv(movies_csv_file, dtype=str)
@@ -140,15 +138,19 @@ if __name__ == '__main__':
         # Pre-clean the freshly read data
         df = pre_clean_movies(df)
 
-        print(f"Saving to {pre_cleaned_parquet}")
-        df.to_parquet(pre_cleaned_parquet, index=False)
+        print(f"Saving to {pre_cleaned_parquet_path}")
+        df.to_parquet(pre_cleaned_parquet_path, index=False)
 
-    explore_movies(df)
 
-    df = clean_movies(df, movie_outputs_path)
-    
-    df.to_parquet(all_cleaned_parquet, index=False)
+    choice = input("Clean the data (y/n): ")
+    if choice == 'y':
+        df = explore_movies(df, title="Before cleaning")
+        df = clean_movies(df)
+        df = explore_movies(df, title="After cleaning")
 
-    explore_movies(df)
+    choice = input("Save the data (y/n): ")
+    if choice == 'y':
+        print(f"Saving cleaned df to {all_cleaned_csv_path}")
+        df.to_csv(all_cleaned_csv_path, index=False)
 
     print("done")

@@ -2,12 +2,27 @@ import json
 import pandas as pd
 import re
 
-col_errors: dict[str, list[str]] = {}
+column_errors: dict[str, list[str]] = {}
 
 def save_column_error(column, error):
-    if column not in col_errors or not isinstance(col_errors[column], list):
-        col_errors[column] = []
-    col_errors[column].append(error)
+    if column not in column_errors or not isinstance(column_errors[column], list):
+        column_errors[column] = []
+    column_errors[column].append(error)
+
+def show_all_column_stats(df):
+    for col in df.columns:
+        show_column_stats(df, col)
+
+def show_column_stats(df, col, title=""):
+    print(f"Column: {col} Stats: {title}")
+    print(df[col].describe())
+    print(f"Number of unique values: {df[col].notnull().nunique()}")
+    errors = column_errors.get(col)
+    num_errors = 0 if errors is None else len(errors)
+    print(f"Column: {col} has {num_errors} extraction errors")
+    if num_errors > 0:
+        for error in errors:
+            print(f"{col}: |{error}|")
 
 def fix_quotes_for_json(input_str):
     # Escape embedded apostrophes using a Unicode escape sequence
@@ -434,7 +449,7 @@ def get_columns_with_numeric_dtypes(df):
 # if fix is true, then replace invalid values with None
 # so they can be easily ignored in future processing
 
-def process_movies(df, fix=False):
+def process_movie_columns(df, fix=False):
     passing_columns = []
     for col in df.columns:
         if col == 'production_companies':
@@ -471,8 +486,11 @@ def process_movies(df, fix=False):
                 change_column_dtype(df, col)
 
     print(f"Passing columns: {passing_columns}")
-    print(f"Column errors: {col_errors}")
-    print(f"fix: {fix}")
+    for col in column_errors:
+        errors = column_errors[col]
+        print(f"Column: {col} has {len(errors)} errors")
+        for error in errors:
+            print(f"{col}: |{error}|")
     
 def test_extractors():
     num_passed = 0
@@ -522,4 +540,4 @@ if __name__ == '__main__':
     test_extractors()
     
     df = pd.read_csv("movies.csv", low_memory=False)
-    process_movies(df, fix=False)
+    process_movie_columns(df, fix=False)
