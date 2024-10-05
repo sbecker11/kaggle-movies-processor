@@ -131,6 +131,13 @@ class TestMoviewColumnTypes(TestCase):
         self.assertIsNotNone(y, "Error should not have returned None")
         self.assertIsInstance(y, dict, "Error should have returned a dict") 
         self.assertEqual(y, expected, f"Error should have returned {expected}")
+        
+        x = "{'id': 9068, 'name': 'The Prophecy Collection', 'poster_path': '/pU4wvBeirFDNk8rs9tsGZLa7Kyb.jpg', 'backdrop_path': None}"
+        y = extract_dict(x)
+        expected = {"id": 9068, "name": "The Prophecy Collection", "poster_path": "/pU4wvBeirFDNk8rs9tsGZLa7Kyb.jpg", "backdrop_path": None}
+        self.assertIsNotNone(y, "Error should not have returned None")  
+        self.assertIsInstance(y, dict, "Error should have returned a dict") 
+        self.assertEqual(y, expected, f"Error should have returned {expected}")  
 
     def test_extract_list_of_dicts(self):
         x = "[{'id': 16, 'name': 'AnimationA'}, {'id': 35, 'name': 'Comedy'}, {'id': 10751, 'name': 'Family'}]"
@@ -180,4 +187,5 @@ class TestMoviewColumnTypes(TestCase):
         x = "2022-10-11T14:14:14.123=06:00"
         y = extract_ymd_datetime(x)
         self.assertIsNone(y, "Error should have returned None")
+
 
