@@ -1,7 +1,7 @@
 import pandas as pd
 import os
-from movie_column_types import process_movie_columns, get_movie_column_type_extractor, get_columns_with_numeric_dtypes
-from stats_utils import show_column_stats
+from column_types import process_columns, get_column_type_extractor, get_columns_with_numeric_dtypes
+from stat_utils import show_column_stats
 from plot_utils import plot_column_distribution
 from sklearn.preprocessing import StandardScaler
 from env_utils import reload_dotenv 
@@ -30,22 +30,6 @@ def pre_clean_movies(df):
 
     return df
 
-
-def explore_movies(df, title=""):
-    
-    # Reports data statistics without modifying the DataFrame 
-    # Assume df has already been pre-cleaned
-    
-    print(f"explore_movies started with rows: {len(df)} columns: {len(df.columns)} {title}")   
-
-    process_movie_columns(df, fix=False)
-    
-    ddf = df.copy()
-    
-    ddf = autoscale_numeric_columns(ddf, verbose=True)
-    
-    print(f"explore_movies finished with rows: {len(df)} columns: {len(df.columns)} {title}")   
-
 def clean_movies(df):
     # The mother cleaner function that applies all the cleaning functions
     # and returns the cleaned DataFrame
@@ -57,7 +41,7 @@ def clean_movies(df):
     # then the cleansing funcion will convert each value to a float
     # or None if conversion is not possible, for example if the value
     # is a string that cannot be converted to a float.
-    df = process_movie_columns(df, fix=True)
+    df = process_columns(df, fix=True)
     
     df = autoscale_numeric_columns(df, verbose=True)
     
@@ -72,6 +56,10 @@ def autoscale_numeric_columns(df, verbose=False):
         df = autoscale_numeric_column(df, col, verbose=verbose)            
     return df
 
+def show_column_stats_and_distribution(df, col, title=""):
+    stat_utils.show_column_stats(df, col, title=title)
+    plot_column_distribution(df, col, title=title)
+
 def autoscale_numeric_column(df, col, verbose=False):
     # use the column type extractor to identify valid values
     # apply StandardScaler to the valid values
@@ -81,12 +69,11 @@ def autoscale_numeric_column(df, col, verbose=False):
     # before and after scaling
     
     if verbose:
-        title = "Column:{col} before scaling"
-        show_column_stats(df, col, title=title)
-        plot_column_distribution(df, col, title=title)
-
+        title = "Column:{col} stats before scaling"
+        show_column_stats_and_distribution(df, col, title=title)
+        
     # Get the column type extractor
-    column_type_extractor = get_movie_column_type_extractor(col)
+    column_type_extractor = get_column_type_extractor(col)
     
     # Create a column type matcher which retuns a valid value or None
     def column_type_matcher(x):
@@ -106,9 +93,8 @@ def autoscale_numeric_column(df, col, verbose=False):
     df.loc[valid_values.index, col] = scaled_values
     
     if verbose:
-        title = "Column:{col} after scaling"
-        show_column_stats(df, col, title=title)
-        plot_column_distribution(df, col, title=title)
+        title = "Column:{col} stats after scaling"
+        show_column_stats_and_distribution(df, col, title=title)
 
     # return the DataFrame with the scaled column
     return df
@@ -132,8 +118,11 @@ if __name__ == '__main__':
         print(f"Reading from {pre_cleaned_parquet_path}")
         df = pd.read_parquet(pre_cleaned_parquet_path)
     else:
-        print(f"Reading from {movies_csv_file} forcing dtype=str")
-        df = pd.read_csv(movies_csv_file, dtype=str)
+        print(f"Reading from {movies_csv_file} NOT forcing dtype=str")
+        df = pd.read_csv(movies_csv_file)
+        
+        for col in df.columns:
+            show_column_stats(df, col)
 
         # Pre-clean the freshly read data
         df = pre_clean_movies(df)
@@ -141,13 +130,7 @@ if __name__ == '__main__':
         print(f"Saving to {pre_cleaned_parquet_path}")
         df.to_parquet(pre_cleaned_parquet_path, index=False)
 
-
-    choice = input("Clean the data (y/n): ")
-    if choice == 'y':
-        explore_movies(df, title="Before cleaning")
-        df = pre_clean_movies(df)
-        df = clean_movies(df)
-        df = explore_movies(df, title="After cleaning")
+    df = clean_movies(df)
 
     choice = input("Save the data (y/n): ")
     if choice == 'y':

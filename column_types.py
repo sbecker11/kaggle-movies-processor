@@ -25,59 +25,8 @@ def show_column_stats(df, col, title=""):
     if num_errors > 0:
         for error in errors:
             print(f"{col}: |{error}|")
-
-def fix_quotes_for_json(input_str):
-    # Escape embedded apostrophes using a Unicode escape sequence
-    # This regular expression targets single quotes that are likely part of the content
-    fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', input_str)
-    fixed_str = fixed_str.replace("'", '"')
-    fixed_str = fixed_str.replace("None", "null")
-    try:
-        json.loads(fixed_str)
-        return fixed_str
-    except (json.JSONDecodeError, ValueError, TypeError) as e:
-        print(f"Debug Error: {e}")
-        print(f"fixed_str: {fixed_str}")
-        # If the JSON decoder fails, try to fix the quotes in the JSON string
-        # This regular expression targets single quotes that are likely part of the content
-        fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
-        try:
-            json.loads(fixed_str)
-            return fixed_str
-        except (json.JSONDecodeError, ValueError, TypeError) as e:
-            print(f"Debug Error: {e}")
-            print(f"fixed_str: {fixed_str}")
-            # If the JSON decoder fails again, return None
-            return None
-        
-
-def json_load_string(s):
-    if s is None:
-        return None
-    try:
-        t = fix_quotes_for_json(s) 
-        if t is None:
-            return None
-        return json.loads(t)
-    except (ValueError, TypeError) as e:
-        print(f"Error: {e}")
-        print(f"Error parsing: {t}")
-        return None
-
-
-# attempt to parse a dict from the given string
-def json_load_dict_string(s):
-    try:
-        result = json_load_string(s)
-        if isinstance(result, dict):
-            return result
-        raise ValueError(f"Expected a dict, got {type(result)}")
-    except (ValueError, TypeError) as e:
-        print(f"Error: {e}")
-        print(f"Error parsing: {s}")
-        return None
     
-
+# process a string, returning None if the string is empty
 def extract_string(x):
     if x is None:
         return None
@@ -85,6 +34,10 @@ def extract_string(x):
         return x.strip()
     return None
 
+def is_string(s):
+    return extract_string(s) is not None
+
+# extract an integer from a an integer, float or string
 def extract_integer(x):
     if x is None:
         return None
@@ -92,16 +45,25 @@ def extract_integer(x):
         return x
     if isinstance(x, float):
         x = str(x)
-    # if x has a decimal point followed by 1 or more zeros, 
-    # remove the decimal point and zeros
-    match = re.match(r"(\d+)\.0+", x)
-    if match:
-        x = match.group(1)
-    if x.isdigit():
-        return int(x)
+    s = extract_string(x)
+    if s is not None:
+        # if s has a decimal point followed by 1 or more zeros, 
+        # remove the decimal point and zeros
+        match = re.match(r"(\d+)\.0+", s)
+        if match:
+            x = match.group(1)
+        if x.isdigit():
+            try:
+                return int(x)
+            except ValueError:
+                return None
+        return None
     return None
 
+def is_integer(s):
+    return extract_integer(s) is not None
 
+# extract a float from a float, int or string
 def extract_float(x):
     if x is None:
         return None
@@ -117,72 +79,93 @@ def extract_float(x):
             return None
     return None
 
+def is_float(s):
+    return extract_float(s) is not None
 
+# extract a boolean from a boolean or a string
 def extract_boolean(x):
     if x is None:
         return None
     if isinstance(x, bool):
         return x
-    if extract_string(x) is not None:
-        x = x.strip().lower()
-        if x == "true":
+    s = extract_string(x)
+    if s is not None:
+        s = s.strip().lower()
+        if s == "true":
             return True
-        if x == "false":
+        if s == "false":
             return False
     return None
 
-def extract_dict(x):
-    if x is None or isinstance(x, dict):
-        return x
-    s = extract_string(x)
-    if s is not None:
-        try:
-            y = json_load_dict_string(s)
-            if isinstance(y, dict):
-                return y
-        except (ValueError, TypeError):
-            return None
-    return None
+def is_boolean(s):
+    return extract_boolean(s) is not None
 
-def is_dict(x):
-    d = extract_dict(x)
-    return d is not None
-
-
-def extract_list_of_dicts(x):
-    ## return a list of at least one dict from a string
-    ## any of the dicts can be empty
-    ## or return None
-    if x is None:
+# extract an object from the given string
+# or return None if the string 
+# cannot be json-parsed
+def extract_object(input_str):
+    if input_str is None or not isinstance(input_str, str) or len(input_str.strip()) == 0:
         return None
-    if isinstance(x, list):
-        return x
-    # This function should only be called with a string with scquare brackets
-    s = extract_string(x)
-    if s is None or not s.startswith('[') or not s.endswith(']'):
-        return None
-        
-    list_of_dicts = []
     try:
-        y = json_load_string(s)
-        if isinstance(y, list):
-            if len(y) == 0:
+        y = json.loads(input_str)
+        if isinstance(y, object):
+            return y
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        print(f"Debug Error 1: {e}")
+        print(f"input_str: {input_str}")
+        # Escape internal apostrophes using a Unicode escape sequence
+        fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', input_str)
+        # Replace all remaining single quotes with double quotes
+        fixed_str = fixed_str.replace("'", '"')
+        # Replace the unicode escape sequence back to single quotes
+        fixed_str = fixed_str.replace('\\u0027', "'")
+        # Replacc python None with json null
+        fixed_str = fixed_str.replace("None", "null")
+        try:
+            y = json.loads(fixed_str)
+            if isinstance(y, object):
+                return y
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            print(f"Debug Error 2: {e}")
+            print(f"fixed_str: {fixed_str}")
+            # If the JSON decoder fails, try to fix the quotes in the JSON string
+            # This regular expression targets single quotes that are likely part of the content
+            final_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
+            try:
+                y = json.loads(final_str)
+                if isinstance(y, object):
+                    return y
+            except (json.JSONDecodeError, ValueError, TypeError) as e:
+                print(f"Debug Error 3: {e}")
+                print(f"fixed_str: {final_str}")
+                # If the JSON decoder fails again, return None
                 return None
-            for i in y:
-                if isinstance(i, dict):
-                    list_of_dicts.append(i)
-                    continue
-                else:
-                    ## if any element i is not a dict, return None
-                    return None
-            if len(list_of_dicts) == 0:
-                return None
-            return list_of_dicts
-    except (ValueError, TypeError) as e:
-        print(f"Error: {e}")
-        print(f"Error parsing: {s}")
-        return None
+
+# attempt to extract a dict object from the given string
+# or return None if the string cannot be json-parsed
+def extract_dict(s):
+    v = extract_object(s)
+    if isinstance(v, dict):
+        return v
     return None
+
+# return true if the given string 
+# can be json-parsed into a possibly empty 
+# dict otherwise return false
+def is_dict(x):
+    return extract_dict(x) is not None
+
+# attempt to extract a list of at least one dict from 
+# the given string or return None if the string 
+# cannot be json-parsed
+def extract_list_of_dict(s):
+    v = extract_object(s)
+    if v is not None and isinstance(v, list) and len(v) > 0 and all(isinstance(x, dict) for x in v):
+        return v
+    return None
+
+def is_list_of_dict(x):
+    return extract_list_of_dict(x) is not None
 
 def extract_status_categories(x):
     if extract_string(x) is not None:
@@ -191,21 +174,31 @@ def extract_status_categories(x):
             return x
     return None
 
-def extract_ymd_datetime(x):
-    if extract_string(x) is not None:
-        x = x.strip()
-        if len(x) == 10:
-            try:
-                return pd.to_datetime(x, format="%Y-%m-%d")
-            except ValueError:
-                return None
+def is_status_categories(s):
+    return extract_status_categories(s) is not None
+
+# try to extract a pandas.datetime from a 
+# 10-character string or return Non
+def extract_ymd_datetime(s):
+    t = extract_string(s)
+    if t is not None and isinstance(t, str):
+        # yyyy-mm-dd is strictly 10 chars in length
+        if len(t) != 10:
+            return None
+        try:
+            return pd.to_datetime(t, format="%Y-%m-%d")
+        except ValueError:
+            return None
     return None
+
+def is_ymd_datetime(s):
+    return extract_ymd_datetime(s) is not None
 
 column_type_extractors = {
     "boolean": extract_boolean,
     "dict": extract_dict,
     "integer": extract_integer,
-    "list_of_dicts": extract_list_of_dicts,
+    "list_of_dict": extract_list_of_dict,
     "string": extract_string,
     "float":  extract_float,
     "date": extract_ymd_datetime,
@@ -215,17 +208,17 @@ target_dtypes = {
     "boolean": "bool",
     "dict": "dict",
     "integer": "int",
-    "list_of_dicts": "list",
+    "list_of_dict": "list",
     "string": "str",
     "float": "float",
     "date": "datetime",
     "status_categories": "str"
 }
-movie_column_types = {
+column_types = {
     "adult": "boolean",
     "belongs_to_collection": "dict",
     "budget": "integer",
-    "genres": "list_of_dicts",
+    "genres": "list_of_dict",
     "homepage": "string",
     "id": "integer",
     "imdb_id": "string",
@@ -234,12 +227,12 @@ movie_column_types = {
     "overview": "string",
     "popularity": "float",
     "poster_path": "string",
-    "production_companies": "list_of_dicts",
-    "production_countries": "list_of_dicts",
+    "production_companies": "list_of_dict",
+    "production_countries": "list_of_dict",
     "release_date": "ymd_date",
     "revenue": "integer",
     "runtime": "float",
-    "spoken_languages": "list_of_dicts",
+    "spoken_languages": "list_of_dict",
     "status": "status_categories",
     "tagline": "string",
     "title": "string",
@@ -248,18 +241,18 @@ movie_column_types = {
     "vote_count": "integer"
 }
 
-def get_movie_column_type(col):
-    return movie_column_types.get(col)
+def get_column_type(col):
+    return column_types.get(col)
 
-def get_movie_column_extractor(col):
-    return column_type_extractors[movie_column_types.get(col)]
+def get_column_extractor(col):
+    return column_type_extractors[column_types.get(col)]
 
-def get_movie_column_type_extractor(movie_column_type):
-    return column_type_extractors[movie_column_type]
+def get_column_type_extractor(column_type):
+    return column_type_extractors[column_type]
 
 # Function to change the data type of a column
 def change_column_dtype(df, col):
-    target_dtype = target_dtypes.get(movie_column_types.get(col))
+    target_dtype = target_dtypes.get(column_types.get(col))
     if target_dtype is None:
         print(f"Column: {col} has no target_dtype")
         return df
@@ -292,16 +285,17 @@ def get_columns_with_numeric_dtypes(df):
 # if fix is true, then replace invalid values with None
 # so they can be easily ignored in future processing
 
-def process_movie_columns(df, fix=False):
+def process_columns(df, fix=False):
     passing_columns = []
     for col in df.columns:
+        # for debugging
         if col == 'production_companies':
             pass
-        movie_column_type = movie_column_types.get(col)
-        if movie_column_type is None:
-            print(f"Column: {col} has no movie_column_type")
+        column_type = column_types.get(col)
+        if column_type is None:
+            print(f"Column: {col} has no column_type")
             continue
-        column_type_extractor = column_type_extractors.get(movie_column_type)
+        column_type_extractor = column_type_extractors.get(column_type)
         if column_type_extractor is None:
             print(f"Column: {col} has no column_type_extractor")
             continue
@@ -310,16 +304,16 @@ def process_movie_columns(df, fix=False):
         all_values_match = df[col].dropna().apply(column_type_matcher).all()
         if all_values_match:
             passing_columns.append(col)
-            print(f"All non-null values of column: {col} are of type {movie_column_type}")
+            print(f"All non-null values of column: {col} are of type {column_type}")
         else:
             # find all unique non-null values that do not match the column type
             non_matching_mask = df[col].dropna().apply(lambda x: not column_type_matcher(x))
             non_matching_unique_values = df[col].dropna()[non_matching_mask].unique()
             n = len(non_matching_unique_values)
             if n > 0:
-                print(f"Column: {col} has {n} non-null values that do not match {movie_column_type}")
+                print(f"Column: {col} has {n} non-null values that do not match {column_type}")
                 for v in non_matching_unique_values:
-                    error = f"|{v}| does not match {movie_column_type} for column: {col}"
+                    error = f"|{v}| does not match {column_type} for column: {col}"
                     print(error)
                     save_column_error(col, error)
                 if fix:
@@ -337,10 +331,10 @@ def process_movie_columns(df, fix=False):
         run_datetime = pd.Timestamp.now().isoformat()
         dashed_line = ('-') * 80
         print(dashed_line, file=tee)
-        print(f"process_movie_columns run at: {run_datetime}", file=tee)
+        print(f"process_columns run at: {run_datetime}", file=tee)
         print(f"Passing columns: {passing_columns}", file=tee)
         for col in column_errors:
-            coltype = get_movie_column_type(col)
+            coltype = get_column_type(col)
             dtype = target_dtypes.get(coltype)
             errors = column_errors[col]
             print(f"Column: [{col}] [{coltype}/{dtype}] has {len(errors)} errors", file=tee)
@@ -353,4 +347,4 @@ def process_movie_columns(df, fix=False):
 if __name__ == '__main__':
     
     df = pd.read_csv("movies.csv", low_memory=False)
-    process_movie_columns(df, fix=False)
+    process_columns(df, fix=False)

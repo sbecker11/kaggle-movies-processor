@@ -3,6 +3,23 @@ import numpy as np
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
+def show_dataframe_stats(df, title=""):
+    if title and len(title.trim()) > 0:
+        print(title)
+    nrows = len(df)
+    print(f"rows: {nrows}")
+    print(f"cols: {len(df.columns())}")
+    if nrows == 0:
+        return
+    for col in df.columns():
+        print(f"col:{col} dtype:{df[col].dtype}")
+        nmissing = df[col].isnull().sum()
+        nunique = df[col].nunique()
+        nduplicates = df[col].duplicated()
+        print(f"  # missing: {nmissing} % missing {100*nmissing/nrows}")
+        print(f"  # unique: {nunique} % uniques {100*nunique/nrows}")
+        print(f"  # uplicated: {nduplicates} % duplicates {100*nduplicates/nrows}")
+
 def show_column_stats(df, col, title=""):
     if df[col].dtype == 'object':
         print(f"Column: {col} is of type 'object'")

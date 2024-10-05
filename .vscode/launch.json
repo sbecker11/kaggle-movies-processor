@@ -2,19 +2,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "debug test_is_dict",
+            "name": "debug test_is_dict_string",
             "type": "debugpy",
             "request": "launch",
             "cwd": "${workspaceFolder}",
-            "program": "test_is_dict.py",
+            "program": "test_is_dict_string.py",
             "console": "integratedTerminal"
         },
         {
-            "name": "debug movie_column_types",
+            "name": "debug column_types",
             "type": "debugpy",
             "request": "launch",
             "cwd": "${workspaceFolder}",
-            "program": "movie_column_types.py",
+            "program": "column_types.py",
             "console": "integratedTerminal"
         },
         {
@@ -38,14 +38,14 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "debug unittest test_movie_column_types.py",
+            "name": "debug unittest test_column_types.py",
             "type": "debugpy",
             "request": "launch",
             "module": "unittest",
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
             "args": [
-                "test_movie_column_types.py"
+                "test_column_types.py"
             ],
             "console": "integratedTerminal"
         }
