@@ -144,7 +144,8 @@ if __name__ == '__main__':
 
     choice = input("Clean the data (y/n): ")
     if choice == 'y':
-        df = explore_movies(df, title="Before cleaning")
+        explore_movies(df, title="Before cleaning")
+        df = pre_clean_movies(df)
         df = clean_movies(df)
         df = explore_movies(df, title="After cleaning")
 
