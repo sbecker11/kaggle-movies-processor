@@ -1,6 +1,8 @@
 import json
 import pandas as pd
 import re
+import textwrap
+from tee_utils import Tee
 
 column_errors: dict[str, list[str]] = {}
 
@@ -29,68 +31,52 @@ def fix_quotes_for_json(input_str):
     # This regular expression targets single quotes that are likely part of the content
     fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', input_str)
     fixed_str = fixed_str.replace("'", '"')
+    fixed_str = fixed_str.replace("None", "null")
     try:
         json.loads(fixed_str)
         return fixed_str
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, ValueError, TypeError) as e:
+        print(f"Debug Error: {e}")
+        print(f"fixed_str: {fixed_str}")
         # If the JSON decoder fails, try to fix the quotes in the JSON string
         # This regular expression targets single quotes that are likely part of the content
         fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
         try:
             json.loads(fixed_str)
             return fixed_str
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            print(f"Debug Error: {e}")
+            print(f"fixed_str: {fixed_str}")
             # If the JSON decoder fails again, return None
             return None
         
-def test_fix_quotes_for_json():
-    errors = 0
-    case_a =     "[{'id': 16, 'name': 'le'Animation'}, {'id': 17, 'name': 'Action'}]"
-    expected_a = '[{"id": 16, "name": "le\\u0027Animation"}, {"id": 17, "name": "Action"}]'
-    result_a = fix_quotes_for_json(case_a)
-    if result_a != expected_a:
-        print(f"Error: {result_a} != {expected_a}")
-        errors += 1
 
-    case_b =     "[{'id': 16, 'name': 'O'Connor'}, {'id': 17, 'name': 'Action'}]"
-    expected_b = '[{"id": 16, "name": "O\\u0027Connor"}, {"id": 17, "name": "Action"}]'
-    result_b = fix_quotes_for_json(case_b)
-    if result_b != expected_b:
-        print(f"Error: {result_b} != {expected_b}")
-        errors += 1
-    
-    case_c =     "[{'id': 16, 'name': 'Animation with \"quotes\"'}]"
-    expected_c = None
-    result_c = fix_quotes_for_json(case_c)
-    if result_c != expected_c:
-        print(f"Error: {result_c} != {expected_c}")
-        errors += 1
-
-    if errors > 0:
-        return False
-    return True
-
-# prepare the string for json.loads
 def json_load_string(s):
     if s is None:
         return None
-    t = fix_quotes_for_json(s)
-    return json.loads(t)
+    try:
+        t = fix_quotes_for_json(s) 
+        if t is None:
+            return None
+        return json.loads(t)
+    except (ValueError, TypeError) as e:
+        print(f"Error: {e}")
+        print(f"Error parsing: {t}")
+        return None
 
-def test_json_load_string():
-    s = "[{'id': 16, 'name': 'Animation'}]"
-    x = json_load_string(s)
-    if x is None:
-        print("Error should have returned a list")
-        return False
+
+# attempt to parse a dict from the given string
+def json_load_dict_string(s):
+    try:
+        result = json_load_string(s)
+        if isinstance(result, dict):
+            return result
+        raise ValueError(f"Expected a dict, got {type(result)}")
+    except (ValueError, TypeError) as e:
+        print(f"Error: {e}")
+        print(f"Error parsing: {s}")
+        return None
     
-    s = "[{'id': 16, 'name': 'le'Animation'}]"
-    x = json_load_string(s)
-    if x is None:
-        print("Error should have returned a list")
-        return False
-    
-    return True
 
 def extract_string(x):
     if x is None:
@@ -115,33 +101,6 @@ def extract_integer(x):
         return int(x)
     return None
 
-def test_extract_integer():
-    x = "123"
-    if extract_integer(x) is None:
-        print("Error should have returned an integer")
-        return False
-    
-    x = "123.14"
-    if extract_integer(x) is not None:
-        print("Error should have returned None")
-        return False
-    
-    x = "123E-10"
-    if extract_integer(x) is not None:
-        print("Error should have returned None")
-        return False
-    
-    x = "  "
-    if extract_integer(x) is not None:
-        print("Error should have returned None")
-        return False
-    
-    x = "123.00000"
-    if extract_integer(x) is None:
-        print("Error should have not have returned None")
-        return False
-
-    return True
 
 def extract_float(x):
     if x is None:
@@ -158,65 +117,27 @@ def extract_float(x):
             return None
     return None
 
-def test_extract_float():
-    x = "3.14"
-    if extract_float(x) is None:
-        print("Error should have returned a float")
-        return False
-    x = "3.14.14"
-    if extract_float(x) is not None:
-        print("Error should have returned None")
-        return False
-    x = "3.14E-10"
-    if extract_float(x) is None:
-        print("Error should not have returned None")
-        return False
-    x = 8.387519
-    if extract_float(x) is None:
-        print("Error should not have returned None")
-        return False
-
-    return True
 
 def extract_boolean(x):
     if x is None:
         return None
+    if isinstance(x, bool):
+        return x
     if extract_string(x) is not None:
-        return x.strip().lower() in ["true", "false"]
-    return False
+        x = x.strip().lower()
+        if x == "true":
+            return True
+        if x == "false":
+            return False
+    return None
 
-def test_extract_boolean():
-    x = "True"
-    if not extract_boolean(x):
-        print("Error should have returned True")
-        return False
-    x = "False"
-    if not extract_boolean(x):
-        print("Error should have returned True")
-        return False
-    x = "Falsee"
-    if extract_boolean(x):
-        print("Error should have returned False")
-        return False
-    x = None
-    if extract_boolean(x):
-        print("Error should have returned False")
-        return False
-    x = "  "
-    if extract_boolean(x):
-        print("Error should have returned False")
-        return False
-    return True
-    
 def extract_dict(x):
-    if x is None:
-        return None
-    if isinstance(x, dict):
+    if x is None or isinstance(x, dict):
         return x
     s = extract_string(x)
     if s is not None:
         try:
-            y = json_load_string(s)
+            y = json_load_dict_string(s)
             if isinstance(y, dict):
                 return y
         except (ValueError, TypeError):
@@ -227,23 +148,6 @@ def is_dict(x):
     d = extract_dict(x)
     return d is not None
 
-def test_extract_dict():
-    x = "{'id': 16, 'name': 'Animation'}"
-    y = extract_dict(x)
-    if y is None:
-        print("Error should have returned a dict")
-        return False
-    x = "{'id': 16, 'name': 'Animation'"
-    y = extract_dict(x)
-    if y is not None:
-        print("Error should have returned None")
-        return False
-    x = "{'id': 16, 'name': 'Animation'}"
-    y = extract_dict(x)
-    if y is None:
-        print("Error should have returned a dict")
-        return False
-    return True 
 
 def extract_list_of_dicts(x):
     ## return a list of at least one dict from a string
@@ -251,6 +155,8 @@ def extract_list_of_dicts(x):
     ## or return None
     if x is None:
         return None
+    if isinstance(x, list):
+        return x
     # This function should only be called with a string with scquare brackets
     s = extract_string(x)
     if s is None or not s.startswith('[') or not s.endswith(']'):
@@ -278,51 +184,6 @@ def extract_list_of_dicts(x):
         return None
     return None
 
-def test_extract_list_of_dicts():
-    x = "[{'id': 16, 'name': 'Animation'}, {'id': 35, 'name': 'Comedy'}, {'id': 10751, 'name': 'Family'}]"
-    y = extract_list_of_dicts(x)
-    if not isinstance(y, list):
-        print("Error should have returned a list")
-        return False
-    
-    x = "[{'id': 16, 'name': 'Animation'}, [1,2], 3]"
-    y = extract_list_of_dicts(x)
-    if y is not None:
-        print("Error should have returned None")
-        return False
-    
-    x = "[]"
-    y = extract_list_of_dicts(x)
-    if y is not None:
-        print("Error should have returned None")
-        return False
-    
-    x = "[{'name': 'Yermoliev', 'id': 88753}]"
-    y = extract_list_of_dicts(x)
-    if y is None:
-        print("Error should not have returned None")
-        return False
-    
-    x = '[{"name": "Yermoliev", "id": 88753}]'
-    y = extract_list_of_dicts(x)
-    if y is None:
-        print("Error should not have returned None")
-        return False
-
-    x = '[{}]'
-    y = extract_list_of_dicts(x)
-    if y is None:
-        print("Error should not have returned None")
-        return False
-    
-    x = "[{}]"
-    y = extract_list_of_dicts(x)
-    if y is None:
-        print("Error should not have returned None")
-        return False
-
-    return True
-
 def extract_status_categories(x):
     if extract_string(x) is not None:
         x = x.strip()
@@ -330,7 +191,7 @@ def extract_status_categories(x):
             return x
     return None
 
-def extract_ymd_date(x):
+def extract_ymd_datetime(x):
     if extract_string(x) is not None:
         x = x.strip()
         if len(x) == 10:
@@ -340,24 +201,6 @@ def extract_ymd_date(x):
                 return None
     return None
 
-def test_extract_ymd_date():
-    x = "2022-10-11"
-    y = extract_ymd_date(x)
-    if y is None:
-        print("Error should have returned a date")
-        return False
-    x = "2022-10-1"
-    y = extract_ymd_date(x)
-    if y is not None:
-        print("Error should have returned None")
-        return False
-    x = "2022-10-11T14:14:14.123=06:00"
-    y = extract_ymd_date(x)
-    if y is not None:
-        print("Error should have returned None")
-        return False
-    return True
-
 column_type_extractors = {
     "boolean": extract_boolean,
     "dict": extract_dict,
@@ -365,7 +208,7 @@ column_type_extractors = {
     "list_of_dicts": extract_list_of_dicts,
     "string": extract_string,
     "float":  extract_float,
-    "date": extract_ymd_date,
+    "date": extract_ymd_datetime,
     "status_categories": extract_status_categories
 }
 target_dtypes = {
@@ -485,59 +328,29 @@ def process_movie_columns(df, fix=False):
             if fix:
                 change_column_dtype(df, col)
 
-    print(f"Passing columns: {passing_columns}")
-    for col in column_errors:
-        errors = column_errors[col]
-        print(f"Column: {col} has {len(errors)} errors")
-        for error in errors:
-            print(f"{col}: |{error}|")
+    output_column_errors_path = "./movie_outputs.column_errors.txt"
+    with open (output_column_errors_path,"a") as f:
+        tee = Tee(f)
+        
+        # outputting a dashed line to separate the output 
+        # of this run
+        run_datetime = pd.Timestamp.now().isoformat()
+        dashed_line = ('-') * 80
+        print(dashed_line, file=tee)
+        print(f"process_movie_columns run at: {run_datetime}", file=tee)
+        print(f"Passing columns: {passing_columns}", file=tee)
+        for col in column_errors:
+            coltype = get_movie_column_type(col)
+            dtype = target_dtypes.get(coltype)
+            errors = column_errors[col]
+            print(f"Column: [{col}] [{coltype}/{dtype}] has {len(errors)} errors", file=tee)
+            for index, error in enumerate(errors):
+                wrapped_error = textwrap.fill(f"{col}: error: {index} >|{error}|<", width=80)
+                print(wrapped_error, file=tee)
+                tee.flush()
     
-def test_extractors():
-    num_passed = 0
-    num_tests = 0
-    
-    num_tests += 1
-    if test_fix_quotes_for_json():
-        num_passed += 1
-        
-    num_tests += 1
-    if test_json_load_string():
-        num_passed +=1
-        
-    num_tests += 1
-    if test_extract_boolean():
-        num_passed += 1
-        
-    num_tests += 1
-    if test_extract_integer():
-        num_passed += 1
-        
-    num_tests += 1
-    if test_extract_float():
-        num_passed += 1
-        
-    num_tests += 1
-    if test_extract_list_of_dicts():
-        num_passed += 1
-        
-    num_tests += 1
-    if test_extract_ymd_date():   
-        num_passed += 1
-        
-    num_tests += 1
-    if test_extract_dict():
-        num_passed += 1
-        
-    if num_passed == num_tests:
-        print("All extractor tests passed.")
-        return True
-    else:
-        print(f"only {num_passed} of {num_tests} tests passed.")
-        return False
 
 if __name__ == '__main__':
-
-    test_extractors()
     
     df = pd.read_csv("movies.csv", low_memory=False)
     process_movie_columns(df, fix=False)

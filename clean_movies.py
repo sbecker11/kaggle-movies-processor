@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-from movie_column_types import process_movie_columns, get_movie_column_type, get_movie_column_type_extractor, get_columns_with_numeric_dtypes
+from movie_column_types import process_movie_columns, get_movie_column_type_extractor, get_columns_with_numeric_dtypes
 from stats_utils import show_column_stats
 from plot_utils import plot_column_distribution
 from sklearn.preprocessing import StandardScaler
