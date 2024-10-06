@@ -1,7 +1,7 @@
 import pandas as pd
 import os
-from column_types import process_columns, get_column_type_extractor, get_columns_with_numeric_dtypes
-from stat_utils import show_column_stats
+from column_types import process_columns, get_column_type_extractor
+import stat_utils
 from plot_utils import plot_column_distribution
 from sklearn.preprocessing import StandardScaler
 from env_utils import reload_dotenv 
@@ -41,7 +41,7 @@ def clean_movies(df):
     # then the cleansing funcion will convert each value to a float
     # or None if conversion is not possible, for example if the value
     # is a string that cannot be converted to a float.
-    df = process_columns(df, fix=True)
+    df = process_columns(df)
     
     df = autoscale_numeric_columns(df, verbose=True)
     
@@ -51,7 +51,7 @@ def clean_movies(df):
     return df
 
 def autoscale_numeric_columns(df, verbose=False):
-    numeric_columns = get_columns_with_numeric_dtypes(df)
+    numeric_columns = []
     for col in numeric_columns:
         df = autoscale_numeric_column(df, col, verbose=verbose)            
     return df
@@ -118,8 +118,8 @@ if __name__ == '__main__':
         print(f"Reading from {pre_cleaned_parquet_path}")
         df = pd.read_parquet(pre_cleaned_parquet_path)
     else:
-        print(f"Reading from {movies_csv_file} NOT forcing dtype=str")
-        df = pd.read_csv(movies_csv_file)
+        print(f"Reading from {movies_csv_file} forcing dtype=str")
+        df = pd.read_csv("movies.csv", dtype=str, low_memory=False)
         
         for col in df.columns:
             show_column_stats(df, col)

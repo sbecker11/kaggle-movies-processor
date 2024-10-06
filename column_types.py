@@ -3,10 +3,12 @@ import pandas as pd
 import re
 import textwrap
 from tee_utils import Tee
+import ast
 
 column_errors: dict[str, list[str]] = {}
 
 def save_column_error(column, error):
+    # create a new column_errors entry with an empty array
     if column not in column_errors or not isinstance(column_errors[column], list):
         column_errors[column] = []
     column_errors[column].append(error)
@@ -100,46 +102,69 @@ def extract_boolean(x):
 def is_boolean(s):
     return extract_boolean(s) is not None
 
-# extract an object from the given string
-# or return None if the string 
-# cannot be json-parsed
+# extract a list or a dict from the given string
+# or return None if the string has the wrong format
+# or cannot be json-parsed
 def extract_object(input_str):
     if input_str is None or not isinstance(input_str, str) or len(input_str.strip()) == 0:
         return None
+    
+    input_str = input_str.strip()
+    
+    # check if unwrapped has list, dict or tuple syntax
+    if input_str[0] in ['"', "'"] and input_str[-1] == input_str[0]:
+        unwrapped = input_str[1:-1].strip()
+        if unwrapped[0] not in '[{(':
+            return None
+    
     try:
         y = json.loads(input_str)
-        if isinstance(y, object):
+        if isinstance(y, (list, dict)):
             return y
     except (json.JSONDecodeError, ValueError, TypeError) as e:
-        print(f"Debug Error 1: {e}")
-        print(f"input_str: {input_str}")
-        # Escape internal apostrophes using a Unicode escape sequence
-        fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', input_str)
-        # Replace all remaining single quotes with double quotes
-        fixed_str = fixed_str.replace("'", '"')
-        # Replace the unicode escape sequence back to single quotes
-        fixed_str = fixed_str.replace('\\u0027', "'")
-        # Replacc python None with json null
-        fixed_str = fixed_str.replace("None", "null")
+        # print(f"Debug Error 1: {e}")
+        # print(f"on json.loads on input_str: {input_str}")
+
+        # try a literal evaluation
+        # e.g. input_str: '[{\'name\': \'The Booking\'s Office\'}]'
         try:
-            y = json.loads(fixed_str)
-            if isinstance(y, object):
+            y = ast.literal_eval(input_str)
+            if y is not None and isinstance(y, (list, dict)):
                 return y
-        except (json.JSONDecodeError, ValueError, TypeError) as e:
+        except (ValueError, SyntaxError) as e:
             print(f"Debug Error 2: {e}")
-            print(f"fixed_str: {fixed_str}")
-            # If the JSON decoder fails, try to fix the quotes in the JSON string
-            # This regular expression targets single quotes that are likely part of the content
-            final_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
+            print(f"on literal eval on input_str: {input_str}")
+
+            # replace internal single quotes with encoded form
+            fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
+            # replace all remaining single quotes with double quotes
+            fixed_str = fixed_str.replace("'", '"')
+            # decode the encoded single quotes
+            fixed_str = fixed_str.replace('\\u0027', "'")
+            # replace python None with Json null
+            fixed_str = fixed_str.replace("None", "null")
+            
             try:
-                y = json.loads(final_str)
-                if isinstance(y, object):
+                y = json.loads(fixed_str)
+                if isinstance(y, (list, dict)):
                     return y
             except (json.JSONDecodeError, ValueError, TypeError) as e:
                 print(f"Debug Error 3: {e}")
-                print(f"fixed_str: {final_str}")
-                # If the JSON decoder fails again, return None
-                return None
+                print(f"on json.loads on fixed_str: {fixed_str}")
+                
+                # If the JSON decoder fails, try to fix the quotes in the JSON string
+                # This regular expression targets single quotes that are likely part of the content
+                final_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
+                try:
+                    y = json.loads(final_str)
+                    if isinstance(y, (list, dict)):
+                        return y
+                except (json.JSONDecodeError, ValueError, TypeError) as e:
+                    print(f"Debug Error 4: {e}")
+                    print(f"json.loads on final_str: {final_str}")
+                    
+                    # If the JSON decoder fails again, return None
+                    return None
 
 # attempt to extract a dict object from the given string
 # or return None if the string cannot be json-parsed
@@ -160,8 +185,12 @@ def is_dict(x):
 # cannot be json-parsed
 def extract_list_of_dict(s):
     v = extract_object(s)
-    if v is not None and isinstance(v, list) and len(v) > 0 and all(isinstance(x, dict) for x in v):
-        return v
+    if v is not None and isinstance(v, list):
+        if len(v) > 0:
+            if all(isinstance(x, dict) for x in v):
+                return v
+            return None
+        return None
     return None
 
 def is_list_of_dict(x):
@@ -251,41 +280,41 @@ def get_column_type_extractor(column_type):
     return column_type_extractors[column_type]
 
 # Function to change the data type of a column
-def change_column_dtype(df, col):
-    target_dtype = target_dtypes.get(column_types.get(col))
-    if target_dtype is None:
-        print(f"Column: {col} has no target_dtype")
-        return df
-    # Ensure all non-null values match the target data type
-    if target_dtype == 'int':
-        df[col] = df[col].apply(lambda x: int(x) if pd.notna(x) else x)
-    elif target_dtype == 'float':
-        df[col] = df[col].apply(lambda x: float(x) if pd.notna(x) else x)
-    elif target_dtype == 'bool':
-        df[col] = df[col].apply(lambda x: x.strip().lower() == 'true' if pd.notna(x) else x)
-    elif target_dtype == 'str':
-        df[col] = df[col].apply(lambda x: str(x) if pd.notna(x) else x)
+# def change_column_dtype(df, col):
+#     target_dtype = target_dtypes.get(column_types.get(col))
+#     if target_dtype is None:
+#         print(f"Column: {col} has no target_dtype")
+#         return df
+#     # Ensure all non-null values match the target data type
+#     if target_dtype == 'int':
+#         df[col] = df[col].apply(lambda x: int(x) if pd.notna(x) else x)
+#     elif target_dtype == 'float':
+#         df[col] = df[col].apply(lambda x: float(x) if pd.notna(x) else x)
+#     elif target_dtype == 'bool':
+#         df[col] = df[col].apply(lambda x: x.strip().lower() == 'true' if pd.notna(x) else x)
+#     elif target_dtype == 'str':
+#         df[col] = df[col].apply(lambda x: str(x) if pd.notna(x) else x)
     
-    # Change the data type of the column
-    df[col] = df[col].astype(target_dtype)
-    print(f"Changed data type of column: {col} to {target_dtype}")
-    return df
+#     # Change the data type of the column
+#     df[col] = df[col].astype(target_dtype)
+#     print(f"Changed data type of column: {col} to {target_dtype}")
+#     return df
 
-def is_dtype_numeric(dtype):
-    return dtype in ['int', 'float']
+# def is_dtype_numeric(dtype):
+#     return dtype in ['int', 'float']
 
-def get_columns_with_numeric_dtypes(df):
-    numeric_columns = []
-    for col in df.columns:
-        if is_dtype_numeric(df[col].dtype):
-            numeric_columns.append(col)
-    return numeric_columns
+# def get_columns_with_numeric_dtypes(df):
+#     numeric_columns = []
+#     for col in df.columns:
+#         if is_dtype_numeric(df[col].dtype):
+#             numeric_columns.append(col)
+#     return numeric_columns
 
 # process the columns of the DataFrame
-# if fix is true, then replace invalid values with None
+# attempting to replace invalid values with None
 # so they can be easily ignored in future processing
 
-def process_columns(df, fix=False):
+def process_columns(df):
     passing_columns = []
     for col in df.columns:
         # for debugging
@@ -304,26 +333,20 @@ def process_columns(df, fix=False):
         all_values_match = df[col].dropna().apply(column_type_matcher).all()
         if all_values_match:
             passing_columns.append(col)
-            print(f"All non-null values of column: {col} are of type {column_type}")
+            print(f"\nAll non-null values of column: {col} are of type {column_type}")
         else:
             # find all unique non-null values that do not match the column type
             non_matching_mask = df[col].dropna().apply(lambda x: not column_type_matcher(x))
             non_matching_unique_values = df[col].dropna()[non_matching_mask].unique()
             n = len(non_matching_unique_values)
             if n > 0:
-                print(f"Column: {col} has {n} non-null values that do not match {column_type}")
+                print(f"\nColumn: {col} has {n} non-null values that do not match column_type:{column_type}")
                 for v in non_matching_unique_values:
-                    error = f"|{v}| does not match {column_type} for column: {col}"
+                    error = v
                     print(error)
-                    save_column_error(col, error)
-                if fix:
-                    print(f"Fixing {n} values for column: {col}")
-                    df.loc[non_matching_mask, col] = None
-            if fix:
-                change_column_dtype(df, col)
-
-    output_column_errors_path = "./movie_outputs.column_errors.txt"
-    with open (output_column_errors_path,"a") as f:
+                    save_column_error(col, error+'\n')
+    column_type_errors_path = "./column_type_errors.txt"
+    with open (column_type_errors_path,"a") as f:
         tee = Tee(f)
         
         # outputting a dashed line to separate the output 
@@ -342,9 +365,10 @@ def process_columns(df, fix=False):
                 wrapped_error = textwrap.fill(f"{col}: error: {index} >|{error}|<", width=80)
                 print(wrapped_error, file=tee)
                 tee.flush()
+    return df
     
 
 if __name__ == '__main__':
     
-    df = pd.read_csv("movies.csv", low_memory=False)
-    process_columns(df, fix=False)
+    df = pd.read_csv("movies.csv", dtype=str, low_memory=False)
+    process_columns(df)

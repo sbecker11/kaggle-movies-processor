@@ -108,6 +108,12 @@ class TestColumnTypes(TestCase):
         self.assertIsNone(result_b, "Error result should be None")
 
     def test_extract_list_of_dict(self):
+        "{'id': 10194, 'name': 'Toy Story Collection', 'poster_path': '/7G9915LfUQ2lVfwMEEhDsn3kT4B.jpg', 'backdrop_path': '/9FBwqcd9IRruEDUrTdcaafOMKUq.jpg'}"
+        '[{\'name\': \'The Booking Office\', \'id\': 12909}, {\'name\': "Workin\' Man Films", \'id\': 12910}]'
+        '[{\'name\': "Po\' Boy Productions", \'id\': 11787}]'
+        '[{\'name\': \'Canal+\', \'id\': 5358}, {\'name\': \'Zespól Filmowy "Tor"\', \'id\': 7984}, {\'name\': \'Norsk Film\', \'id\': 12984}, {\'name\': \'Sidéral Productions\', \'id\': 63751}]'
+        '[{\'name\': \'Hemdale\', \'id\': 16593}, {\'name\': "Cinema \'84/Greenberg Brothers Partnership", \'id\': 84526}]'
+        
         case_a =     "[{'id': 16, 'name': 'le'Animation1'}, {'id': 17, 'name': 'Action'}]"
         expected_a =  [{'id': 16, 'name': 'le\'Animation1'}, {'id': 17, 'name': 'Action'}]
         result_a = extract_list_of_dict(case_a)
