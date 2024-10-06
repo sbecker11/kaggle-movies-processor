@@ -2,6 +2,7 @@
 
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+import matplotlib.pyplot as plt
 import numpy as np
 
 # Show a matrix of histograms for pairs of numeric columns
@@ -45,9 +46,7 @@ def plot_column_distribution(df, col, title=""):
     fig.update_layout(title_text=f'{title} Distribution of column: {col}')
     fig.show()
     
-    # allow keyboard entry while figure is displayed
-    # plt.ion()
-
+    plt.ion()
     if input("hit 'c' to continue") == 'c':
         print("Continuing...")
         return

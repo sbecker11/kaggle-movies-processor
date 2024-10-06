@@ -5,7 +5,7 @@ import stat_utils
 from plot_utils import plot_column_distribution
 from sklearn.preprocessing import StandardScaler
 from env_utils import reload_dotenv 
-from stat_utils import show_column_stats, show_dataframe_stats
+from stat_utils import show_column_stats
  
 reload_dotenv()
 
@@ -13,19 +13,25 @@ def clean_movies(df):
     # The mother cleaner function that applies all the cleaning functions
     # and returns the cleaned DataFrame
     
-    print(f"clean_movies started with rows: {len(df)} columns: {len(df.columns)}")   
+    print(f"clean_movies starting - rows: {len(df)} columns: {len(df.columns)}")   
 
     # Drop duplicate rows
     num_duplicates = df.duplicated().sum()
     if num_duplicates > 0:
-        print(f"Dropping duplicate rows: {num_duplicates}")
+        indexes_of_duplicate_rows = df[df.duplicated()].index.tolist()
+        ids_of_duplicate_rows = df.loc[indexes_of_duplicate_rows, 'id'].tolist()
+        print(f"Dropping {num_duplicates} row ids: {ids_of_duplicate_rows}")
         df = df.drop_duplicates()
-        
+    
+    print(f"clean_movies after dropping {num_duplicates} duplicate rows - rows: {len(df)} columns: {len(df.columns)}")   
+
     # Drop columns that have all null values
     blank_columns = df.columns[df.isnull().all()]
     print(f"Dropping blank columns: {blank_columns}")
     df = df.drop(columns=blank_columns)
   
+    print(f"clean_movies after dropping {len(blank_columns)} blank columns - rows: {len(df)} columns: {len(df.columns)}")   
+
     # Drop columns with more than 50% missing values
     missing_threshold = 0.5 * len(df)
     missing_columns = df.columns[df.isnull().sum() > missing_threshold] 
