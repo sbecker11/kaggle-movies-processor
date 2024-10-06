@@ -1,16 +1,20 @@
 import pandas as pd
 import os
-from column_types import process_columns, get_column_type_extractor
+from column_types import process_columns, get_column_type_extractor, is_numeric_column
 import stat_utils
 from plot_utils import plot_column_distribution
 from sklearn.preprocessing import StandardScaler
 from env_utils import reload_dotenv 
+from stat_utils import show_column_stats, show_dataframe_stats
  
 reload_dotenv()
 
-# Apply some basic pre-cleaning steps to the raw movies data
-def pre_clean_movies(df):
+def clean_movies(df):
+    # The mother cleaner function that applies all the cleaning functions
+    # and returns the cleaned DataFrame
     
+    print(f"clean_movies started with rows: {len(df)} columns: {len(df.columns)}")   
+
     # Drop duplicate rows
     num_duplicates = df.duplicated().sum()
     if num_duplicates > 0:
@@ -28,14 +32,6 @@ def pre_clean_movies(df):
     print(f"Dropping columns with more than 50% missing values: {missing_columns}") 
     df = df.drop(columns=missing_columns)
 
-    return df
-
-def clean_movies(df):
-    # The mother cleaner function that applies all the cleaning functions
-    # and returns the cleaned DataFrame
-    
-    print(f"clean_movies started with rows: {len(df)} columns: {len(df.columns)}")   
-
     # for each common column type, apply the appropriate cleaning function
     # for example, if each value in a column is defined as a float,
     # then the cleansing funcion will convert each value to a float
@@ -51,10 +47,9 @@ def clean_movies(df):
     return df
 
 def autoscale_numeric_columns(df, verbose=False):
-    numeric_columns = []
-    for col in numeric_columns:
-        df = autoscale_numeric_column(df, col, verbose=verbose)            
-    return df
+    for col in df.columns:
+        if is_numeric_column(col):
+            df = autoscale_numeric_column(df, col, verbose=verbose)            
 
 def show_column_stats_and_distribution(df, col, title=""):
     stat_utils.show_column_stats(df, col, title=title)
@@ -68,9 +63,9 @@ def autoscale_numeric_column(df, col, verbose=False):
     # includes option to show stats and distribution
     # before and after scaling
     
+    title = "Column:{col} stats and distribution"
     if verbose:
-        title = "Column:{col} stats before scaling"
-        show_column_stats_and_distribution(df, col, title=title)
+        show_column_stats_and_distribution(df, col, title=title+" before scaling")
         
     # Get the column type extractor
     column_type_extractor = get_column_type_extractor(col)
@@ -93,8 +88,7 @@ def autoscale_numeric_column(df, col, verbose=False):
     df.loc[valid_values.index, col] = scaled_values
     
     if verbose:
-        title = "Column:{col} stats after scaling"
-        show_column_stats_and_distribution(df, col, title=title)
+        show_column_stats_and_distribution(df, col, title=title+" after scaling")
 
     # return the DataFrame with the scaled column
     return df
@@ -110,31 +104,26 @@ if __name__ == '__main__':
     movie_outputs_path = os.getenv('MOVIES_OUTPUTS_PATH')
     if not movie_outputs_path:
         raise ValueError("MOVIES_OUTPUTS_PATH environment variable is not set")
-
-    pre_cleaned_parquet_path = os.path.join(movie_outputs_path, "pre_cleaned.parquet")
     all_cleaned_csv_path = os.path.join(movie_outputs_path, "all_cleaned.csv")
-        
-    if os.path.exists(pre_cleaned_parquet_path):
-        print(f"Reading from {pre_cleaned_parquet_path}")
-        df = pd.read_parquet(pre_cleaned_parquet_path)
-    else:
-        print(f"Reading from {movies_csv_file} forcing dtype=str")
-        df = pd.read_csv("movies.csv", dtype=str, low_memory=False)
-        
+    
+    print(f"Reading from {movies_csv_file} forcing dtype=str")
+    df = pd.read_csv("movies.csv", dtype=str, low_memory=False)
+    
+    # before doing any cleaning, show the stats of 
+    # of the original dataframe
+    if input("Want to review the dataset stats?") == 'y':
         for col in df.columns:
             show_column_stats(df, col)
 
-        # Pre-clean the freshly read data
-        df = pre_clean_movies(df)
+    if input("Ready to start cleaning the dataset? (y/n): ") == 'y':
+        df = clean_movies(df)
 
-        print(f"Saving to {pre_cleaned_parquet_path}")
-        df.to_parquet(pre_cleaned_parquet_path, index=False)
+        if input("Want to review the final dataset stats?") == 'y':
+            for col in df.columns:
+                show_column_stats(df, col)
 
-    df = clean_movies(df)
-
-    choice = input("Save the data (y/n): ")
-    if choice == 'y':
-        print(f"Saving cleaned df to {all_cleaned_csv_path}")
-        df.to_csv(all_cleaned_csv_path, index=False)
+        if input("Ready to save the data (y/n): ") == 'y':
+            print(f"Saving cleaned df to {all_cleaned_csv_path}")
+            df.to_csv(all_cleaned_csv_path, index=False)
 
     print("done")

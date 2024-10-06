@@ -121,7 +121,7 @@ def extract_object(input_str):
         y = json.loads(input_str)
         if isinstance(y, (list, dict)):
             return y
-    except (json.JSONDecodeError, ValueError, TypeError) as e:
+    except (json.JSONDecodeError, ValueError, TypeError):
         # print(f"Debug Error 1: {e}")
         # print(f"on json.loads on input_str: {input_str}")
 
@@ -223,6 +223,10 @@ def extract_ymd_datetime(s):
 def is_ymd_datetime(s):
     return extract_ymd_datetime(s) is not None
 
+numeric_column_types = {
+    "integer",
+    "float"
+}
 column_type_extractors = {
     "boolean": extract_boolean,
     "dict": extract_dict,
@@ -233,16 +237,16 @@ column_type_extractors = {
     "date": extract_ymd_datetime,
     "status_categories": extract_status_categories
 }
-target_dtypes = {
-    "boolean": "bool",
-    "dict": "dict",
-    "integer": "int",
-    "list_of_dict": "list",
-    "string": "str",
-    "float": "float",
-    "date": "datetime",
-    "status_categories": "str"
-}
+# target_dtypes = {
+#     "boolean": "bool",
+#     "dict": "dict",
+#     "integer": "int",
+#     "list_of_dict": "list",
+#     "string": "str",
+#     "float": "float",
+#     "date": "datetime",
+#     "status_categories": "str"
+# }
 column_types = {
     "adult": "boolean",
     "belongs_to_collection": "dict",
@@ -258,7 +262,7 @@ column_types = {
     "poster_path": "string",
     "production_companies": "list_of_dict",
     "production_countries": "list_of_dict",
-    "release_date": "ymd_date",
+    "release_date": "ymd_datetime",
     "revenue": "integer",
     "runtime": "float",
     "spoken_languages": "list_of_dict",
@@ -270,6 +274,14 @@ column_types = {
     "vote_count": "integer"
 }
 
+def is_numeric_column(col):
+    column_type = get_column_type(col)
+    if column_type is None:
+        raise ValueError(f"column: {col} has no column_type")
+    if column_type in numeric_column_types:
+        return True
+    return False
+    
 def get_column_type(col):
     return column_types.get(col)
 
@@ -315,11 +327,11 @@ def get_column_type_extractor(column_type):
 # so they can be easily ignored in future processing
 
 def process_columns(df):
-    passing_columns = []
+    processed_columns = []
     for col in df.columns:
         # for debugging
-        if col == 'production_companies':
-            pass
+        # if col == 'production_companies':
+        #     pass
         column_type = column_types.get(col)
         if column_type is None:
             print(f"Column: {col} has no column_type")
@@ -332,7 +344,7 @@ def process_columns(df):
             return column_type_extractor(x) is not None
         all_values_match = df[col].dropna().apply(column_type_matcher).all()
         if all_values_match:
-            passing_columns.append(col)
+            processed_columns.append(col)
             print(f"\nAll non-null values of column: {col} are of type {column_type}")
         else:
             # find all unique non-null values that do not match the column type
@@ -340,31 +352,41 @@ def process_columns(df):
             non_matching_unique_values = df[col].dropna()[non_matching_mask].unique()
             n = len(non_matching_unique_values)
             if n > 0:
-                print(f"\nColumn: {col} has {n} non-null values that do not match column_type:{column_type}")
                 for v in non_matching_unique_values:
-                    error = v
-                    print(error)
-                    save_column_error(col, error+'\n')
+                    save_column_error(col, v)
+                    
     column_type_errors_path = "./column_type_errors.txt"
-    with open (column_type_errors_path,"a") as f:
+    print("saving column_type errors to:" + column_type_errors_path)         
+    with open (column_type_errors_path,"w") as f:
         tee = Tee(f)
         
-        # outputting a dashed line to separate the output 
-        # of this run
-        run_datetime = pd.Timestamp.now().isoformat()
-        dashed_line = ('-') * 80
-        print(dashed_line, file=tee)
-        print(f"process_columns run at: {run_datetime}", file=tee)
-        print(f"Passing columns: {passing_columns}", file=tee)
+        # dashed line as run delimiter
+        print(('-') * 80, file=tee)
+        
+        print(f"process_columns run started at: {pd.Timestamp.now().isoformat()}", file=tee)
+        print("", file=tee)
+
+        skipped_columns = [col for col in df.columns if col not in column_errors]
+        print(f"Skipped columns: {skipped_columns}", file=tee)
+        print("", file=tee)
+        print(f"Processed columns: {processed_columns}", file=tee)
         for col in column_errors:
             coltype = get_column_type(col)
-            dtype = target_dtypes.get(coltype)
             errors = column_errors[col]
-            print(f"Column: [{col}] [{coltype}/{dtype}] has {len(errors)} errors", file=tee)
+            num_errors = len(errors)
+            print(f"Column: [{col}] [{coltype}] has {num_errors} errors", file=tee)
             for index, error in enumerate(errors):
-                wrapped_error = textwrap.fill(f"{col}: error: {index} >|{error}|<", width=80)
+                wrapped_error = textwrap.fill(f"{col}: error: {index+1}/{num_errors}\n>|{error}|<", width=80)
                 print(wrapped_error, file=tee)
                 tee.flush()
+    
+        print("", file=tee)
+        print(f"process_columns run finished at: {pd.Timestamp.now().isoformat()}", file=tee)
+        print("", file=tee)
+        tee.flush()
+
+    print("done")
+
     return df
     
 

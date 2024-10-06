@@ -39,16 +39,15 @@ def show_scatter_and_density(df):
         print("Quitting...")
         return
 
-# returns a handle to close the figure
 def plot_column_distribution(df, col, title=""):
     fig = go.Figure()
     fig.add_trace(go.Histogram(x=df[col], histnorm='probability density'))
-    fig.update_layout(title_text=f'{title} - Distribution of {col}')
+    fig.update_layout(title_text=f'{title} Distribution of column: {col}')
     fig.show()
     
     # allow keyboard entry while figure is displayed
     # plt.ion()
 
-    if input("select 'c' to continue") == 'c':
+    if input("hit 'c' to continue") == 'c':
         print("Continuing...")
         return

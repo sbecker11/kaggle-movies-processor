@@ -8,10 +8,10 @@ def show_dataframe_stats(df, title=""):
         print(title)
     nrows = len(df)
     print(f"rows: {nrows}")
-    print(f"cols: {len(df.columns())}")
+    print(f"cols: {len(df.columns)}")
     if nrows == 0:
         return
-    for col in df.columns():
+    for col in df.columns:
         print(f"col:{col} dtype:{df[col].dtype}")
         nmissing = df[col].isnull().sum()
         nunique = df[col].nunique()
