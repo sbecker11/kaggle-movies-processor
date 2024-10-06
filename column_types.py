@@ -275,21 +275,29 @@ column_types = {
 }
 
 def is_numeric_column(col):
-    column_type = get_column_type(col)
-    if column_type is None:
-        raise ValueError(f"column: {col} has no column_type")
-    if column_type in numeric_column_types:
+    if get_column_type(col) in numeric_column_types:
         return True
     return False
     
 def get_column_type(col):
-    return column_types.get(col)
+    column_type = column_types.get(col)
+    if column_type is None:
+        raise ValueError(f"no column type found for column:{col}")
+    return column_type
 
 def get_column_extractor(col):
-    return column_type_extractors[column_types.get(col)]
+    extractor = column_type_extractors.get(get_column_type(col))
+    if extractor is None:
+        raise ValueError(f"no extractor found for column: {col}")
+    return extractor
+
+        
 
 def get_column_type_extractor(column_type):
-    return column_type_extractors[column_type]
+    extractor = column_type_extractors.get(column_type)
+    if extractor is None:
+        raise ValueError(f"column_type:{column_type} has no extractor")
+    return extractor
 
 # Function to change the data type of a column
 # def change_column_dtype(df, col):
