@@ -2,6 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "debug test_is_dict_string",
             "type": "debugpy",
             "request": "launch",
@@ -48,7 +55,18 @@
                 "test_column_types.py"
             ],
             "console": "integratedTerminal"
+        },
+        {
+            "name": "debug test_stat_utils",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "unittest",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "args": [
+                "test_stat_utils.py"
+            ]
         }
-
     ]
 }

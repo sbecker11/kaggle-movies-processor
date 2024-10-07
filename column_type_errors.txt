@@ -1,15 +1,19 @@
 --------------------------------------------------------------------------------
-process_columns run started at: 2024-10-05T20:45:50.639599
+process_columns run started at: 2024-10-06T18:09:43.542432
 
-Skipped columns: ['imdb_id', 'original_language', 'original_title', 'poster_path', 'release_date', 'revenue', 'runtime', 'status', 'title', 'video', 'vote_average', 'vote_count']
+Skipped columns: ['homepage', 'imdb_id', 'original_language', 'original_title', 'poster_path', 'release_date', 'revenue', 'runtime', 'status', 'title', 'video', 'vote_average', 'vote_count']
 
-Processed columns: ['imdb_id', 'original_language', 'original_title', 'poster_path', 'revenue', 'runtime', 'status', 'title', 'video', 'vote_average', 'vote_count']
+Processed columns: ['homepage', 'imdb_id', 'original_language', 'original_title', 'poster_path', 'revenue', 'runtime', 'status', 'title', 'video', 'vote_average', 'vote_count']
 Column: [adult] [boolean] has 3 errors
 adult: error: 1/3 >| - Written by Ørnås|<
 adult: error: 2/3 >| Rune Balot goes to a casino connected to the October
 corporation to try to wrap up her case once and for all.|<
 adult: error: 3/3 >| Avalanche Sharks tells the story of a bikini contest that
 turns into a horrifying affair when it is hit by a shark avalanche.|<
+Column: [belongs_to_collection] [dict] has 3 errors
+belongs_to_collection: error: 1/3 >|0.065736|<
+belongs_to_collection: error: 2/3 >|1.931659|<
+belongs_to_collection: error: 3/3 >|2.185485|<
 Column: [budget] [integer] has 3 errors
 budget: error: 1/3 >|/ff9qCepilowshEtG2GYWwzt2bs4.jpg|<
 budget: error: 2/3 >|/zV8bHuSL6WXoD6FWogP9j4x80bL.jpg|<
@@ -34,6 +38,8 @@ production_countries: error: 3/4 >|7.0|<
 production_countries: error: 4/4 >|4.3|<
 Column: [spoken_languages] [list_of_dict] has 1 errors
 spoken_languages: error: 1/1 >|[]|<
+Column: [tagline] [string] has 1 errors
+tagline: error: 1/1 >|   |<
 
-process_columns run finished at: 2024-10-05T20:45:50.640716
+process_columns run finished at: 2024-10-06T18:09:43.547762
 

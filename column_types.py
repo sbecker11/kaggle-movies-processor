@@ -196,15 +196,15 @@ def extract_list_of_dict(s):
 def is_list_of_dict(x):
     return extract_list_of_dict(x) is not None
 
-def extract_status_categories(x):
+def extract_status_category(x):
     if extract_string(x) is not None:
         x = x.strip()
         if x in ["Rumored", "Planned", "In Production", "Post Production", "Released", "Canceled"]:
             return x
     return None
 
-def is_status_categories(s):
-    return extract_status_categories(s) is not None
+def is_status_category(s):
+    return extract_status_category(s) is not None
 
 # try to extract a pandas.datetime from a 
 # 10-character string or return Non
@@ -234,19 +234,19 @@ column_type_extractors = {
     "list_of_dict": extract_list_of_dict,
     "string": extract_string,
     "float":  extract_float,
-    "date": extract_ymd_datetime,
-    "status_categories": extract_status_categories
+    "ymd_datetime": extract_ymd_datetime,
+    "status_category": extract_status_category
 }
-# target_dtypes = {
-#     "boolean": "bool",
-#     "dict": "dict",
-#     "integer": "int",
-#     "list_of_dict": "list",
-#     "string": "str",
-#     "float": "float",
-#     "date": "datetime",
-#     "status_categories": "str"
-# }
+column_type_dtypes = {
+    "boolean": "bool",
+    "dict": "object",
+    "integer": "int64",
+    "list_of_dict": "object",
+    "string": "string",
+    "float": "float64",
+    "ymd_datetime": "datetime64",
+    "status_category": "string"
+}
 column_types = {
     "adult": "boolean",
     "belongs_to_collection": "dict",
@@ -266,7 +266,7 @@ column_types = {
     "revenue": "integer",
     "runtime": "float",
     "spoken_languages": "list_of_dict",
-    "status": "status_categories",
+    "status": "status_category",
     "tagline": "string",
     "title": "string",
     "video": "boolean",
@@ -285,13 +285,46 @@ def get_column_type(col):
         raise ValueError(f"no column type found for column:{col}")
     return column_type
 
+def get_column_dtype(col):
+    column_type = get_column_type(col)
+    dtype = column_type_dtypes.get(column_type)
+    if dtype is None:
+        raise ValueError(f"no dtype found for column_type {column_type}")
+    return dtype
+
+def get_column_names_from_csv_file(csv_path):
+    with open(csv_path, "r") as f:
+        first_row = f.readline().split(',')
+    column_names = [first_row[i].strip() for i in range(len(first_row))]
+    if len(column_names) != len(first_row):
+        raise ValueError("item count failure")                    
+    return column_names
+
+def get_column_names_from_df(df):
+    return df.columns
+
+def verify_column_names(csv_path, df):
+    # raise ValueError if column names don't match
+    csv_columns = get_column_names_from_csv_file(csv_path)
+    df_columns = get_column_names_from_df(df)
+    if len(csv_columns) != len(df_columns):
+        raise ValueError(f"csv length:{len(csv_columns)} != df length:{len(df_columns)}")
+
+    csv_set = set(csv_columns)
+    df_set = set(df_columns)
+    if not (csv_set == df_set):
+        errors = []
+        for i in range(len(csv_columns)):
+            if csv_columns[i] != df_columns[i]:
+                errors.append(f"i: {csv_columns[i]} != {df_columns[i]}")
+        if len(errors) > 0:
+            raise ValueError(",".join(errors))
+
 def get_column_extractor(col):
     extractor = column_type_extractors.get(get_column_type(col))
     if extractor is None:
         raise ValueError(f"no extractor found for column: {col}")
     return extractor
-
-        
 
 def get_column_type_extractor(column_type):
     extractor = column_type_extractors.get(column_type)
@@ -400,5 +433,13 @@ def process_columns(df):
 
 if __name__ == '__main__':
     
-    df = pd.read_csv("movies.csv", dtype=str, low_memory=False)
-    process_columns(df)
+    movies_csv = "movies.csv"
+    movies_df = pd.read_csv(movies_csv, dtype=str, low_memory=False)
+    
+    verify_column_names(movies_csv, movies_df)
+    
+    pairs = [f"{col}:{get_column_dtype(col)}" for col in movies_df.columns]
+
+    print("\n".join(pairs))
+        
+    process_columns(movies_df)
