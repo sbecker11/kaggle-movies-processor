@@ -136,7 +136,7 @@ def extract_object(input_str):
             print(f"on literal eval on input_str: {input_str}")
 
             # replace internal single quotes with encoded form
-            fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
+            fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', input_str)
             # replace all remaining single quotes with double quotes
             fixed_str = fixed_str.replace("'", '"')
             # decode the encoded single quotes
@@ -278,6 +278,9 @@ def is_numeric_column(col):
     if get_column_type(col) in numeric_column_types:
         return True
     return False
+
+def get_numeric_columns(df):
+    return [col for col in df.columns if is_numeric_column(col)]
     
 def get_column_type(col):
     column_type = column_types.get(col)

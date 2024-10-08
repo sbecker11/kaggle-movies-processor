@@ -6,7 +6,8 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from column_types import get_column_type, is_numeric_column, get_column_dtype
 from tabulate import tabulate
 from decorators import char_decoder
-from string_utils import SpecialChars, format_value, print_wrapped_list, Justify
+from string_utils import format_value, Justify
+# from string_utils import print_wrapped_list
 
 TABULATE_CHAR_UNCODED = ' '
 TABULETE_CHAR_ENCODED = 'ψ'
@@ -79,8 +80,9 @@ def format_index_value(index_value, idx_size, idx_width):
     # return a center justified index value with 'char_encoded' for padding
     index_value = format_value(str(index_value).strip(), idx_size, idx_width, justify=Justify.CENTER)
     pattern = r'^(\s*)(\w*)(\s*)$'
+    encoder = tabulate_encoder
     def replace_whitespace(match):
-        replaced = tabulate_encoder(match.group(1)) + match.group(2) + tabulate_encoder(match.group(3))
+        replaced = encoder(match.group(1)) + match.group(2) + encoder(match.group(3))
         return replaced
     index_value = re.sub(pattern, replace_whitespace, str(index_value))
     return index_value
