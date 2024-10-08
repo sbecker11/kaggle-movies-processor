@@ -67,6 +67,18 @@
             "args": [
                 "test_stat_utils.py"
             ]
+        },
+        {
+            "name": "debug test_string_utils",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "unittest",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "args": [
+                "test_string_utils.py"
+            ]
         }
     ]
 }
