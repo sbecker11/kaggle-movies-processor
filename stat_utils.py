@@ -1,10 +1,12 @@
 import pandas as pd
 import numpy as np
+import re
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from column_types import get_column_type, is_numeric_column, get_column_dtype
 from tabulate import tabulate
-from string_utils import format_value, print_wrapped_list, Justify
+from decorators import space_encoded, space_decoder
+from string_utils import SpecialChars, format_value, print_wrapped_list, Justify
 
 def show_dataframe_stats(df, title=""):
     print(f"{'='*80}")
@@ -63,6 +65,25 @@ def show_duplicates(df):
     print("\nkeeping only rows with rank=1 and dropping rank column")
     print(df)
 
+# uses space_encoded to work with tabulate_plus 
+# which is decorated with @space_decoder
+def format_index_value(index_value, idx_size, idx_width):
+    # debug break when index_value is an int
+    if isinstance(index_value, int):
+        pass
+    # return a center justified index value with 'space_encoded' for padding
+    index_value = format_value(str(index_value).strip(), idx_size, idx_width, justify=Justify.CENTER)
+    pattern = r'^(\s*)(\w*)(\s*)$'
+    dash = SpecialChars.PSI_CHAR.value
+    def replace_whitespace(match):
+        replaced = match.group(1).replace(' ', space_encoded) + match.group(2) + match.group(3).replace(' ', dash)
+        return replaced
+    index_value = re.sub(pattern, replace_whitespace, str(index_value))
+    return index_value
+
+@space_decoder
+def tabulate_plus(*args, **kwargs):
+    return tabulate(*args, **kwargs)
 
 # Show the first and last N rows and columns of the DataFrame
 # format columns, indexes, and values using val_size and col_width.
@@ -110,7 +131,7 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
         if isinstance(dff.index, (pd.MultiIndex)):
             raise ValueError("MultiIndex not supported")
         # index values are allowed to take up the entire col_width
-        dff.index = dff.index.map(lambda x: format_value(x, col_width, col_width, justify=Justify.CENTER))
+        dff.index = dff.index.map(lambda x: format_index_value(x, col_width, col_width))
         num_cols += 1 # add a column for the index
     
     # Set the column alignment to center for all columns (including the index)
@@ -122,14 +143,14 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     # set row N to have dots in all values
     top_half_df.iloc[N] = '...'
     
-    # set the index of row N to be empty
-    top_half_df.index = top_half_df.index.map(lambda x: ' '*col_width if x == top_half_df.index[N] else x)
+    # set the index of row N to be a string with col_width dashes
+    top_half_df.index = top_half_df.index.map(lambda x: '-'*col_width if x == top_half_df.index[N] else x)
     
     # format values only (index values for the entire df are already formatted)
     top_half_df = top_half_df.map(lambda x: format_value(x, val_size, col_width))
 
     # tabulate top_half_df with column names in header and a dotted row at the bottom
-    top_half_table = tabulate(top_half_df, headers='keys', tablefmt='grid', showindex=show_index, colalign=colalign)
+    top_half_table = tabulate_plus(top_half_df, headers='keys', tablefmt='grid', showindex=show_index, colalign=colalign)
     print(top_half_table)
 
     # get the selected cols of the lasat N rows
@@ -139,7 +160,7 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     btm_half_df = btm_half_df.map(lambda x: format_value(x, val_size, col_width))
 
     # tabulate btm_half_df with column names in header 
-    btm_half_pre_table = tabulate(btm_half_df, headers='keys', tablefmt='grid', showindex=show_index, colalign=colalign)
+    btm_half_pre_table = tabulate_plus(btm_half_df, headers='keys', tablefmt='grid', showindex=show_index, colalign=colalign)
 
     # Remove the header row and the top and bottom divider lines
     btm_half_lines = btm_half_pre_table.split('\n')

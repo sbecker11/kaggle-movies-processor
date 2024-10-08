@@ -64,6 +64,7 @@ def print_wrapped_list(title, indent=None,  wrap=5, list=[]):
         print(f"{indent}{list[i:j]}")
 
 def format_engineering_value(value):
+    # Format a numeric value in engineering notation
     if value is None or not isinstance(value, (int, float)):
         return ''
     if math.isnan(value):
@@ -112,7 +113,11 @@ def format_value(value, val_size, fill_width, justify=None):
     # format it to fill or fit within the specified width.
     # for str values, truncate to max_chars and add ellipsis.
     # NaN and numeric values are right justified
-    # str values are left justified
+    # str values are left justified.
+    #
+    # *Note for numeric values: the numeric value's natural 
+    # string length exceeds the val_size then format it 
+    # in engineering notation (hopefully it fits)
     if not isinstance(value, bool) and value is None:
         value = ' ' * fill_width
         return format_string(value, val_size, fill_width, justify=(justify or Justify.LEFT))
@@ -120,11 +125,18 @@ def format_value(value, val_size, fill_width, justify=None):
         value = str(value)
         return format_string(value, val_size, fill_width, justify=(justify or Justify.LEFT))
     elif isinstance(value, (int, float)):
-        value = format_engineering_value(value)
+        if len(str(value)) > val_size:  # see *Note above
+            value = format_engineering_value(value)
+        else:
+            value = str(value)
         return format_string(value, val_size, fill_width, justify=(justify or Justify.RIGHT))
     elif isinstance(value, str):
         if value.isnumeric():
-            value = format_engineering_value(value)
+            value = int(value.strip()) if value.find('.') < 0 else float(value.strip())
+            if len(str(value)) > val_size:  # see *Note above
+                value = format_engineering_value(value)
+            else:
+                value = str(value)
             return format_string(value, val_size, fill_width, justify=(justify or Justify.RIGHT))
         else:
             return format_string(value, val_size, fill_width, justify=(justify or Justify.LEFT))
