@@ -5,8 +5,11 @@ from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from column_types import get_column_type, is_numeric_column, get_column_dtype
 from tabulate import tabulate
-from decorators import space_encoded, space_decoder
+from decorators import char_decoder
 from string_utils import SpecialChars, format_value, print_wrapped_list, Justify
+
+TABULATE_CHAR_UNCODED = ' '
+TABULETE_CHAR_ENCODED = 'ψ'
 
 def show_dataframe_stats(df, title=""):
     print(f"{'='*80}")
@@ -65,23 +68,27 @@ def show_duplicates(df):
     print("\nkeeping only rows with rank=1 and dropping rank column")
     print(df)
 
-# uses space_encoded to work with tabulate_plus 
-# which is decorated with @space_decoder
+# uses  
+# TABULATE_CHAR_ENCODED in place of 
+# TABULATE_CHAR_UNCODED to work with
+# tabulate_plus which is decorated with @char_decoder
 def format_index_value(index_value, idx_size, idx_width):
     # debug break when index_value is an int
     if isinstance(index_value, int):
         pass
-    # return a center justified index value with 'space_encoded' for padding
+    # return a center justified index value with 'char_encoded' for padding
     index_value = format_value(str(index_value).strip(), idx_size, idx_width, justify=Justify.CENTER)
     pattern = r'^(\s*)(\w*)(\s*)$'
-    dash = SpecialChars.PSI_CHAR.value
     def replace_whitespace(match):
-        replaced = match.group(1).replace(' ', space_encoded) + match.group(2) + match.group(3).replace(' ', dash)
+        replaced = tabulate_encoder(match.group(1)) + match.group(2) + tabulate_encoder(match.group(3))
         return replaced
     index_value = re.sub(pattern, replace_whitespace, str(index_value))
     return index_value
 
-@space_decoder
+def tabulate_encoder(input_char):
+    return input_char.replace(TABULATE_CHAR_UNCODED, TABULETE_CHAR_ENCODED)
+
+@char_decoder(TABULETE_CHAR_ENCODED, TABULATE_CHAR_UNCODED)
 def tabulate_plus(*args, **kwargs):
     return tabulate(*args, **kwargs)
 
@@ -102,17 +109,17 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     # Select the first N columns and the last N columns
     first_cols = list(dff.columns[:N])
     last_cols = list(dff.columns[-N:])
-    print(f"DEBUG: first {N} cols: {first_cols}")
-    print(f"DEBUG: last {N} cols: {last_cols}")
+    # print(f"DEBUG: first {N} cols: {first_cols}")
+    # print(f"DEBUG: last {N} cols: {last_cols}")
 
     # Create a column of dots
     dots_col = pd.Series(['...' for _ in range(len(dff))], name='dots_col')
     dots_col.index = dff.index  # Ensure the index matches
 
     # Insert the dots column in the middle of the selected columns
-    print_wrapped_list(title=f"DEBUG: {len(dff.columns.tolist())} cols before concat dots:",list=dff.columns.to_list())
+    # print_wrapped_list(title=f"DEBUG: {len(dff.columns.tolist())} cols before concat dots:",list=dff.columns.to_list())
     dff = pd.concat([dff[first_cols], dots_col, dff[last_cols]], axis=1)
-    print_wrapped_list(title=f"DEBUG: {len(dff.columns.tolist())} cols after concat dots:",list=dff.columns.to_list())
+    # print_wrapped_list(title=f"DEBUG: {len(dff.columns.tolist())} cols after concat dots:",list=dff.columns.to_list())
 
     # if this little check is not included, the dots_col 
     # is not found and KeyError will be raised
@@ -121,7 +128,7 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
         
     # Update the cols list to include the dots column
     cols = dff.columns.tolist()
-    print_wrapped_list(title=f"DEBUG: {len(dff.columns.tolist())} cols after set dots:", list=dff.columns.to_list())
+    # print_wrapped_list(title=f"DEBUG: {len(dff.columns.tolist())} cols after set dots:", list=dff.columns.to_list())
 
     # Define column alignment (center alignment for all columns)
     # plus one if the showIndex is true
