@@ -110,7 +110,7 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
         if isinstance(dff.index, (pd.MultiIndex)):
             raise ValueError("MultiIndex not supported")
         # index values are allowed to take up the entire col_width
-        dff.index = dff.index.map(lambda x: format_value(x, col_width, col_width))
+        dff.index = dff.index.map(lambda x: format_value(x, col_width, col_width, justify=Justify.CENTER))
         num_cols += 1 # add a column for the index
     
     # Set the column alignment to center for all columns (including the index)
