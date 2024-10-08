@@ -4,7 +4,7 @@ from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from column_types import get_column_type, is_numeric_column, get_column_dtype
 from tabulate import tabulate
-from string_utils import format_value, print_wrapped_list
+from string_utils import format_value, print_wrapped_list, Justify
 
 def show_dataframe_stats(df, title=""):
     print(f"{'='*80}")
@@ -75,7 +75,7 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     # rename the column names to fit within the specified column width
     cols = dff.columns.tolist()
     for col in dff.columns:
-        dff.rename(columns={col: format_value(col, val_size, col_width)}, inplace=True)
+        dff.rename(columns={col: format_value(col, val_size, col_width, justify=Justify.CENTER)}, inplace=True)
     cols = dff.columns.tolist()
 
     # Select the first N columns and the last N columns
@@ -109,7 +109,8 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     if show_index:
         if isinstance(dff.index, (pd.MultiIndex)):
             raise ValueError("MultiIndex not supported")
-        dff.index = dff.index.map(lambda x: format_value(x, val_size, col_width))
+        # index values are allowed to take up the entire col_width
+        dff.index = dff.index.map(lambda x: format_value(x, col_width, col_width))
         num_cols += 1 # add a column for the index
     
     # Set the column alignment to center for all columns (including the index)
@@ -122,11 +123,10 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     top_half_df.iloc[N] = '...'
     
     # set the index of row N to be empty
-    top_half_df.index = top_half_df.index.map(lambda x: '' if x == top_half_df.index[N] else x)
+    top_half_df.index = top_half_df.index.map(lambda x: ' '*col_width if x == top_half_df.index[N] else x)
     
-    # format values and indexes
+    # format values only (index values for the entire df are already formatted)
     top_half_df = top_half_df.map(lambda x: format_value(x, val_size, col_width))
-    top_half_df.index = top_half_df.index.map(lambda x: format_value(x, val_size, col_width))
 
     # tabulate top_half_df with column names in header and a dotted row at the bottom
     top_half_table = tabulate(top_half_df, headers='keys', tablefmt='grid', showindex=show_index, colalign=colalign)
@@ -135,9 +135,8 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     # get the selected cols of the lasat N rows
     btm_half_df = dff[cols].tail(N)
     
-    # format values and indexes
+    # format values only (index values for the entire df are already formatted)
     btm_half_df = btm_half_df.map(lambda x: format_value(x, val_size, col_width))
-    btm_half_df.index = btm_half_df.index.map(lambda x: format_value(x, val_size, col_width))
 
     # tabulate btm_half_df with column names in header 
     btm_half_pre_table = tabulate(btm_half_df, headers='keys', tablefmt='grid', showindex=show_index, colalign=colalign)

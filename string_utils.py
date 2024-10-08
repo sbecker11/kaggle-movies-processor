@@ -1,7 +1,7 @@
 import json
 from decimal import Decimal
 import pandas as pd
-
+import math
 from enum import Enum
 
 
@@ -64,6 +64,10 @@ def print_wrapped_list(title, indent=None,  wrap=5, list=[]):
         print(f"{indent}{list[i:j]}")
 
 def format_engineering_value(value):
+    if value is None or not isinstance(value, (int, float)):
+        return ''
+    if math.isnan(value):
+        return 'NaN'
     # Format a numeric value in engineering notation
     decimal_value = Decimal(value)
     engineering_format = '{:e}'.format(decimal_value)
@@ -71,6 +75,8 @@ def format_engineering_value(value):
     # Split the engineering notation into mantissa and exponent
     mantissa, exponent = engineering_format.split('e')
     exponent = int(exponent)
+    if exponent == 0:
+        return mantissa
     
     # Adjust the exponent to be a multiple of 3
     exponent_adjusted = exponent - (exponent % 3)

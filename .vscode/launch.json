@@ -21,7 +21,17 @@
             "type": "debugpy",
             "request": "launch",
             "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
             "program": "column_types.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug stat_utils",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "program": "stat_utils.py",
             "console": "integratedTerminal"
         },
         {
