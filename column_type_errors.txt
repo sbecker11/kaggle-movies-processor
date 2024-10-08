@@ -1,0 +1,45 @@
+--------------------------------------------------------------------------------
+process_columns run started at: 2024-10-06T18:09:43.542432
+
+Skipped columns: ['homepage', 'imdb_id', 'original_language', 'original_title', 'poster_path', 'release_date', 'revenue', 'runtime', 'status', 'title', 'video', 'vote_average', 'vote_count']
+
+Processed columns: ['homepage', 'imdb_id', 'original_language', 'original_title', 'poster_path', 'revenue', 'runtime', 'status', 'title', 'video', 'vote_average', 'vote_count']
+Column: [adult] [boolean] has 3 errors
+adult: error: 1/3 >| - Written by Ørnås|<
+adult: error: 2/3 >| Rune Balot goes to a casino connected to the October
+corporation to try to wrap up her case once and for all.|<
+adult: error: 3/3 >| Avalanche Sharks tells the story of a bikini contest that
+turns into a horrifying affair when it is hit by a shark avalanche.|<
+Column: [belongs_to_collection] [dict] has 3 errors
+belongs_to_collection: error: 1/3 >|0.065736|<
+belongs_to_collection: error: 2/3 >|1.931659|<
+belongs_to_collection: error: 3/3 >|2.185485|<
+Column: [budget] [integer] has 3 errors
+budget: error: 1/3 >|/ff9qCepilowshEtG2GYWwzt2bs4.jpg|<
+budget: error: 2/3 >|/zV8bHuSL6WXoD6FWogP9j4x80bL.jpg|<
+budget: error: 3/3 >|/zaSf5OG7V8X8gqFvly88zDdRm46.jpg|<
+Column: [genres] [list_of_dict] has 1 errors
+genres: error: 1/1 >|[]|<
+Column: [id] [integer] has 3 errors
+id: error: 1/3 >|1997-08-20|<
+id: error: 2/3 >|2012-09-29|<
+id: error: 3/3 >|2014-01-01|<
+Column: [overview] [string] has 1 errors
+overview: error: 1/1 >| |<
+Column: [popularity] [float] has 1 errors
+popularity: error: 1/1 >|Beware Of Frost Bites|<
+Column: [production_companies] [list_of_dict] has 2 errors
+production_companies: error: 1/2 >|[]|<
+production_companies: error: 2/2 >|False|<
+Column: [production_countries] [list_of_dict] has 4 errors
+production_countries: error: 1/4 >|[]|<
+production_countries: error: 2/4 >|6.0|<
+production_countries: error: 3/4 >|7.0|<
+production_countries: error: 4/4 >|4.3|<
+Column: [spoken_languages] [list_of_dict] has 1 errors
+spoken_languages: error: 1/1 >|[]|<
+Column: [tagline] [string] has 1 errors
+tagline: error: 1/1 >|   |<
+
+process_columns run finished at: 2024-10-06T18:09:43.547762
+

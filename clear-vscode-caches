@@ -1,0 +1,11 @@
+ Close VS Code
+osascript -e 'quit app "Visual Studio Code"'
+
+# Navigate to the VS Code application support directory
+cd ~/Library/Application\ Support/Code/
+
+# Remove the CachedData folder
+rm -rf CachedData
+
+# Restart VS Code
+open -a "Visual Studio Code"

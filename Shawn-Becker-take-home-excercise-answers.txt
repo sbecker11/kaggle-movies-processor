@@ -1,0 +1,277 @@
+PatientIQ
+Data Engineering Take-Home Exercise
+
+Shawn Becker
+09/20/2024
+
+
+question #1
+Which movie(s) had the 3rd highest revenue?
+
+SELECT imdb_id, original_title, revenue
+FROM patient_iq_schema.raw_movies
+where revenue::NUMERIC > 0
+ORDER BY revenue DESC
+offset 2 limit 1;
+
+  imdb_id  |     original_title     | revenue
+-----------+------------------------+---------
+ tt2288121 | Tot yeshchyo Karloson! | 9938268
+
+check with top 4
+  imdb_id  |     original_title     | revenue
+-----------+------------------------+----------
+ tt0465494 | Hitman                 | 99965753
+ tt0111301 | Street Fighter         | 99423521
+ tt2288121 | Tot yeshchyo Karloson! | 9938268 <-- 3rd highest
+ tt1327194 | The Lucky One          | 99357138
+
+
+question #2
+Which movies did not recoup their budget? 
+(Where revenue did not exceed budget).  
+For brevity, list the first 3 (as ordered by 
+imdb_id) as the response to this question.
+
+-- show some rows where revenue is less than budget
+select imdb_id, original_title, 
+revenue::NUMERIC - budget::NUMERIC as profit
+from patient_iq_schema.raw_movies
+WHERE revenue ~ '^[0-9]+(\.[0-9]+)?$' 
+AND budget ~ '^[0-9]+(\.[0-9]+)?$'
+AND revenue::NUMERIC < budget::NUMERIC
+and imdb_id <> ''
+order by revenue::NUMERIC - budget::NUMERIC
+limit 10;
+
+  imdb_id  |                original_title                |   profit
+-----------+----------------------------------------------+------------
+ tt1210819 | The Lone Ranger                              | -165710090
+ tt0780653 | The Wolfman                                  | -150000000
+ tt4503906 | ポケモン・ザ・ムービーXY 光輪の超魔神 フーパ | -150000000
+ tt0185906 | Band of Brothers                             | -125000000
+ tt0374463 | The Pacific                                  | -120000000
+ tt0318974 | The Alamo                                    | -119180039
+ tt1305591 | Mars Needs Moms                              | -111007242
+ tt2239822 | Valerian and the City of a Thousand Planets  | -107447384
+ tt1586740 | Double Wedding                               | -104002432
+ tt0328880 | Brother Bear                                 | -100000000
+
+-- now show the first 3 after sorting by imdb_id 
+select imdb_id, original_title, 
+revenue::NUMERIC - budget::NUMERIC as profit
+from patient_iq_schema.raw_movies
+WHERE revenue ~ '^[0-9]+(\.[0-9]+)?$' 
+AND budget ~ '^[0-9]+(\.[0-9]+)?$'
+AND revenue::NUMERIC < budget::NUMERIC
+and imdb_id <> ''
+order by imdb_id
+limit 3;
+
+  imdb_id  |     original_title      | profit
+-----------+-------------------------+--------
+ tt0000417 | Le Voyage dans la Lune  |  -5985
+ tt0000439 | The Great Train Robbery |   -150
+ tt0000498 | Rescued by Rover        |    -37
+
+question #3
+What's the average revenue per genre?  
+List them in order from highest to lowest 
+average revenue.  For brevity, list the first 
+three as the response to this question.
+
+-- show some genres to see if they are json-valid
+SELECT genres
+FROM patient_iq_schema.raw_movies
+ORDER BY imdb_id
+LIMIT 5;
+
+[{'id': 35, 'name': 'Comedy'}, {'id': 10749, 'name': 'Romance'}]
+ [{'id': 35, 'name': 'Comedy'}, {'id': 18, 'name': 'Drama'}, {'id': 10749, 'name': 'Romance'}]
+ [{'id': 18, 'name': 'Drama'}, {'id': 10749, 'name': 'Romance'}]
+ [{'id': 18, 'name': 'Drama'}, {'id': 10749, 'name': 'Romance'}]
+ [{'id': 18, 'name': 'Drama'}, {'id': 10749, 'name': 'Romance'}]
+
+-- make genres json parseable by replacing single 
+-- quotes with double quotes - 45466
+
+UPDATE patient_iq_schema.raw_movies
+SET genres = REPLACE(genres, '''', '"')
+WHERE genres is not null;
+
+with genre_revenue as (
+    SELECT jsonb_array_elements_text(genres::jsonb) as genre, revenue::NUMERIC
+    FROM patient_iq_schema.raw_movies
+    WHERE jsonb_typeof(genres::jsonb) = 'array'
+    and revenue is not null
+    and revenue ~ '^[0-9]+(\.[0-9]+)?$'
+) SELECT genre, round(avg(revenue)) as avg_revenue
+from genre_revenue
+group by genre
+order by avg_revenue desc
+limit 3;
+              genre              | avg_revenue
+---------------------------------+-------------
+ {"id": 12, "name": "Adventure"} |    57242375
+ {"id": 14, "name": "Fantasy"}   |    44978258
+ {"id": 10751, "name": "Family"} |    38713063
+(3 rows)
+
+-- let's show some more, for context
+with genre_revenue as (
+    SELECT jsonb_array_elements_text(genres::jsonb) as genre, revenue::NUMERIC
+    FROM patient_iq_schema.raw_movies
+    WHERE jsonb_typeof(genres::jsonb) = 'array'
+    and revenue is not null
+    and revenue ~ '^[0-9]+(\.[0-9]+)?$'
+) SELECT genre, round(avg(revenue)) as avg_revenue
+from genre_revenue
+group by genre
+order by avg_revenue desc
+limit 20;
+
+                 genre                  | avg_revenue
+----------------------------------------+-------------
+ {"id": 12, "name": "Adventure"}        |    57242375 <- top 3
+ {"id": 14, "name": "Fantasy"}          |    44978258 <- top 3
+ {"id": 10751, "name": "Family"}        |    38713063 <- top 3
+ {"id": 16, "name": "Animation"}        |    34917340
+ {"id": 878, "name": "Science Fiction"} |    32134963
+ {"id": 28, "name": "Action"}           |    30551480
+ {"id": 53, "name": "Thriller"}         |    17030244
+ {"id": 80, "name": "Crime"}            |    14724791
+ {"id": 9648, "name": "Mystery"}        |    14087805
+ {"id": 35, "name": "Comedy"}           |    12660998
+ {"id": 10752, "name": "War"}           |    12026046
+ {"id": 10749, "name": "Romance"}       |    10914129
+ {"id": 36, "name": "History"}          |    10659656
+ {"id": 10402, "name": "Music"}         |     8366891
+ {"id": 18, "name": "Drama"}            |     7937436 <- drama from question 5
+ {"id": 10756, "name": "Sports"}        |     7740000
+ {"id": 27, "name": "Horror"}           |     6600406
+ {"id": 37, "name": "Western"}          |     4916026
+ {"id": 99, "name": "Documentary"}      |      368649
+ {"id": 10769, "name": "Foreign"}       |      179799
+ {"id": 10770, "name": "TV Movie"}      |       54830
+(20 rows)
+
+question #4 - How many movies are in more than one language?
+
+-- set invalid spoken_languages values to null - 6
+UPDATE patient_iq_schema.raw_movies
+SET spoken_languages = NULL
+WHERE spoken_languages !~ '^\[.*\]$';
+
+-- show some rows that cause json array parsing errors
+SELECT spoken_languages
+FROM patient_iq_schema.raw_movies
+WHERE spoken_languages ~ '\\x'
+LIMIT 5;
+
+[{'iso_639_1': 'lt', 'name': 'Lietuvi\x9akai'}]
+ [{'iso_639_1': 'lt', 'name': 'Lietuvi\x9akai'}]
+ [{'iso_639_1': 'et', 'name': 'Eesti'}, {'iso_639_1': 'lt', 'name': 'Lietuvi\x9akai'}, {'iso_639_1': 'ru', 'name': 'Pусский'}]
+ [{'iso_639_1': 'lt', 'name': 'Lietuvi\x9akai'}]
+ [{'iso_639_1': 'de', 'name': 'Deutsch'}, {'iso_639_1': 'fr', 'name': 'Français'}, {'iso_639_1': 'lt', 'name': 'Lietuvi\x9akai'}, {'iso_639_1': 'nl', 'name': 'Nederlands'}, {'iso_639_1': 'en', 'name': 'English'}]
+(5 rows)
+
+-- replace excape sequences with unicode characters - 26
+UPDATE patient_iq_schema.raw_movies
+SET spoken_languages = REPLACE(spoken_languages, '\x9a', 'š')
+WHERE spoken_languages ~ '\\x' and spoken_languages is not null;
+
+-- replace single quotes with double quotes to make 
+-- them json parseable - 45460
+UPDATE patient_iq_schema.raw_movies
+SET spoken_languages = REPLACE(spoken_languages, '''', '"')
+WHERE spoken_languages is not null;
+
+-- add the spoken_languages_count column
+ALTER TABLE patient_iq_schema.raw_movies
+ADD COLUMN spoken_languages_count integer;
+
+-- set the spoken_languages_count column - 45460
+UPDATE patient_iq_schema.raw_movies
+SET spoken_languages_count = jsonb_array_length(spoken_languages::jsonb)
+where spoken_languages is not null;
+
+-- how many movies have more than 1 spoken_spoke_languages_count 
+SELECT COUNT(*)
+FROM patient_iq_schema.raw_movies
+WHERE spoken_languages_count > 1;
+ count
+-------
+  7895
+
+-- show the min and max spoken_languages_counts
+-- to get an idea of the range of values
+select 
+min(spoken_languages_count), 
+max(spoken_languages_count)
+from patient_iq_schema.raw_movies
+where spoken_languages_count is not null;
+
+ min | max
+-----+-----
+   0 |  19
+   
+-- show the cumulative sum of movies with 
+-- spoken_languages_count > 1 for counts 2 to 19
+-- the final count sould be the same as the count above
+select spoken_languages_count, count(*), sum(count(*)) 
+over (order by spoken_languages_count)
+from patient_iq_schema.raw_movies
+where spoken_languages_count > 1
+group by spoken_languages_count
+order by spoken_languages_count;
+
+ spoken_languages_count | count | sum
+------------------------+-------+------
+                      2 |  5371 | 5371
+                      3 |  1705 | 7076
+                      4 |   550 | 7626
+                      5 |   178 | 7804
+                      6 |    62 | 7866
+                      7 |    14 | 7880
+                      8 |     6 | 7886
+                      9 |     5 | 7891
+                     10 |     1 | 7892
+                     12 |     1 | 7893
+                     13 |     1 | 7894
+                     19 |     1 | 7895 <-- count from above
+
+-- QUESTION #5
+-- For each month, show the top genre by number of releases in that month
+with genre_counts as (
+    SELECT release_month, jsonb_array_elements_text(REPLACE(genres, '''', '"')::jsonb) as genre
+    FROM patient_iq_schema.raw_movies
+    WHERE jsonb_typeof(REPLACE(genres, '''', '"')::jsonb) = 'array'
+    and release_month is not null
+),
+genre_counts_by_month as (
+    SELECT release_month, genre, COUNT(*) as genre_count
+    FROM genre_counts
+    GROUP BY release_month, genre
+)
+SELECT release_month, genre, genre_count
+FROM (
+    SELECT release_month, genre, genre_count, 
+           ROW_NUMBER() OVER (PARTITION BY release_month ORDER BY genre_count DESC) as rn
+    FROM genre_counts_by_month
+) as ranked_genres
+WHERE rn = 1;
+
+ release_month |            genre            | genre_count
+---------------+-----------------------------+-------------
+             1 | {"id": 18, "name": "Drama"} |        2310
+             2 | {"id": 18, "name": "Drama"} |        1413
+             3 | {"id": 18, "name": "Drama"} |        1518
+             4 | {"id": 18, "name": "Drama"} |        1518
+             5 | {"id": 18, "name": "Drama"} |        1624
+             6 | {"id": 18, "name": "Drama"} |        1347
+             7 | {"id": 18, "name": "Drama"} |        1016
+             8 | {"id": 18, "name": "Drama"} |        1487
+             9 | {"id": 18, "name": "Drama"} |        2588
+            10 | {"id": 18, "name": "Drama"} |        2055
+            11 | {"id": 18, "name": "Drama"} |        1663
+            12 | {"id": 18, "name": "Drama"} |        1716

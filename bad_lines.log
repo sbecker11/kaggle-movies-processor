@@ -1,0 +1,18 @@
+Error parsing column 'json_like_col' at row 4.
+  Value  was replaced with None
+  Error message: Expecting value: line 1 column 1 (char 0)
+Error parsing column 'json_like_col' at row 6.
+  Value {"name": "Club d"Investissement Média"} was replaced with None
+  Error message: Expecting ',' delimiter: line 1 column 18 (char 17)
+Error parsing column 'json_like_col' at row 9.
+  Value None was replaced with None
+  Error message: NaN/None is not a valid JSON-like value.
+Error parsing column 'json_like_col' at row 10.
+  Value nan was replaced with None
+  Error message: NaN/None is not a valid JSON-like value.
+Error parsing column 'json_like_col' at row 11.
+  Value 42 was replaced with None
+  Error message: 42 is not a valid JSON-like value.
+Error parsing column 'json_like_col' at row 12.
+  Value False was replaced with None
+  Error message: False is not a valid JSON-like value.
