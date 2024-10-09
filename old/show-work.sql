@@ -1,11 +1,11 @@
 how many movies are in the csv file:
-SELECT COUNT(*) FROM patient_iq_schema.raw_movies; --  45466
+SELECT COUNT(*) FROM kaggle_schema.raw_movies; --  45466
 
 question #1
 Which movie(s) had the 3rd highest revenue?
 
 SELECT imdb_id, original_title, revenue
-FROM patient_iq_schema.raw_movies
+FROM kaggle_schema.raw_movies
 where revenue::NUMERIC > 0
 ORDER BY revenue DESC
 offset 2 limit 1;
@@ -32,7 +32,7 @@ imdb_id) as the response to this question.
 -- show some rows where revenue is less than budget
 select imdb_id, original_title, 
 revenue::NUMERIC - budget::NUMERIC as profit
-from patient_iq_schema.raw_movies
+from kaggle_schema.raw_movies
 WHERE revenue ~ '^[0-9]+(\.[0-9]+)?$' 
 AND budget ~ '^[0-9]+(\.[0-9]+)?$'
 AND revenue::NUMERIC < budget::NUMERIC
@@ -56,7 +56,7 @@ limit 10;
 -- now show the first 3 after sorting by imdb_id 
 select imdb_id, original_title, 
 revenue::NUMERIC - budget::NUMERIC as profit
-from patient_iq_schema.raw_movies
+from kaggle_schema.raw_movies
 WHERE revenue ~ '^[0-9]+(\.[0-9]+)?$' 
 AND budget ~ '^[0-9]+(\.[0-9]+)?$'
 AND revenue::NUMERIC < budget::NUMERIC
@@ -78,7 +78,7 @@ three as the response to this question.
 
 -- show some genres to see if they are json-valid
 SELECT genres
-FROM patient_iq_schema.raw_movies
+FROM kaggle_schema.raw_movies
 ORDER BY imdb_id
 LIMIT 5;
 
@@ -91,13 +91,13 @@ LIMIT 5;
 -- make genres json parseable by replacing single 
 -- quotes with double quotes - 45466
 
-UPDATE patient_iq_schema.raw_movies
+UPDATE kaggle_schema.raw_movies
 SET genres = REPLACE(genres, '''', '"')
 WHERE genres is not null;
 
 with genre_revenue as (
     SELECT jsonb_array_elements_text(genres::jsonb) as genre, revenue::NUMERIC
-    FROM patient_iq_schema.raw_movies
+    FROM kaggle_schema.raw_movies
     WHERE jsonb_typeof(genres::jsonb) = 'array'
     and revenue is not null
     and revenue ~ '^[0-9]+(\.[0-9]+)?$'
@@ -116,7 +116,7 @@ limit 3;
 -- let's show some more, for context
 with genre_revenue as (
     SELECT jsonb_array_elements_text(genres::jsonb) as genre, revenue::NUMERIC
-    FROM patient_iq_schema.raw_movies
+    FROM kaggle_schema.raw_movies
     WHERE jsonb_typeof(genres::jsonb) = 'array'
     and revenue is not null
     and revenue ~ '^[0-9]+(\.[0-9]+)?$'
@@ -154,13 +154,13 @@ limit 20;
 question #4 - How many movies are in more than one language?
 
 -- set invalid spoken_languages values to null - 6
-UPDATE patient_iq_schema.raw_movies
+UPDATE kaggle_schema.raw_movies
 SET spoken_languages = NULL
 WHERE spoken_languages !~ '^\[.*\]$';
 
 -- show some rows that cause json array parsing errors
 SELECT spoken_languages
-FROM patient_iq_schema.raw_movies
+FROM kaggle_schema.raw_movies
 WHERE spoken_languages ~ '\\x'
 LIMIT 5;
 
@@ -172,28 +172,28 @@ LIMIT 5;
 (5 rows)
 
 -- replace excape sequences with unicode characters - 26
-UPDATE patient_iq_schema.raw_movies
+UPDATE kaggle_schema.raw_movies
 SET spoken_languages = REPLACE(spoken_languages, '\x9a', 'š')
 WHERE spoken_languages ~ '\\x' and spoken_languages is not null;
 
 -- replace single quotes with double quotes to make 
 -- them json parseable - 45460
-UPDATE patient_iq_schema.raw_movies
+UPDATE kaggle_schema.raw_movies
 SET spoken_languages = REPLACE(spoken_languages, '''', '"')
 WHERE spoken_languages is not null;
 
 -- add the spoken_languages_count column
-ALTER TABLE patient_iq_schema.raw_movies
+ALTER TABLE kaggle_schema.raw_movies
 ADD COLUMN spoken_languages_count integer;
 
 -- set the spoken_languages_count column - 45460
-UPDATE patient_iq_schema.raw_movies
+UPDATE kaggle_schema.raw_movies
 SET spoken_languages_count = jsonb_array_length(spoken_languages::jsonb)
 where spoken_languages is not null;
 
 -- how many movies have more than 1 spoken_spoke_languages_count 
 SELECT COUNT(*)
-FROM patient_iq_schema.raw_movies
+FROM kaggle_schema.raw_movies
 WHERE spoken_languages_count > 1;
  count
 -------
@@ -204,7 +204,7 @@ WHERE spoken_languages_count > 1;
 select 
 min(spoken_languages_count), 
 max(spoken_languages_count)
-from patient_iq_schema.raw_movies
+from kaggle_schema.raw_movies
 where spoken_languages_count is not null;
 
  min | max
@@ -216,7 +216,7 @@ where spoken_languages_count is not null;
 -- the final count sould be the same as the count above
 select spoken_languages_count, count(*), sum(count(*)) 
 over (order by spoken_languages_count)
-from patient_iq_schema.raw_movies
+from kaggle_schema.raw_movies
 where spoken_languages_count > 1
 group by spoken_languages_count
 order by spoken_languages_count;
@@ -240,7 +240,7 @@ order by spoken_languages_count;
 -- For each month, show the top genre by number of releases in that month
 with genre_counts as (
     SELECT release_month, jsonb_array_elements_text(REPLACE(genres, '''', '"')::jsonb) as genre
-    FROM patient_iq_schema.raw_movies
+    FROM kaggle_schema.raw_movies
     WHERE jsonb_typeof(REPLACE(genres, '''', '"')::jsonb) = 'array'
     and release_month is not null
 ),

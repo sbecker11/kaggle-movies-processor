@@ -13,7 +13,7 @@ def clean_and_pad_row(row):
 
 def create_table_if_not_exists(cur):
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS patient_iq_schema.movies (
+    CREATE TABLE IF NOT EXISTS kaggle_schema.movies (
         adult TEXT,
         belongs_to_collection TEXT,
         budget TEXT,
@@ -44,13 +44,13 @@ def create_table_if_not_exists(cur):
 
 def import_data(cur):
     try:
-        cur.execute("SET search_path TO patient_iq_schema, public;")
-        print("Search path set to patient_iq_schema, public before import")
+        cur.execute("SET search_path TO kaggle_schema, public;")
+        print("Search path set to kaggle_schema, public before import")
         
         create_table_if_not_exists(cur)
 
         # Check if the table is empty
-        cur.execute("SELECT COUNT(*) FROM patient_iq_schema.movies")
+        cur.execute("SELECT COUNT(*) FROM kaggle_schema.movies")
         count = cur.fetchone()[0]
         print(f"Current row count in movies table: {count}")
 
@@ -61,7 +61,7 @@ def import_data(cur):
             print(f"Number of columns in CSV: {len(headers)}")
             
             insert_query = sql.SQL("""
-                INSERT INTO patient_iq_schema.movies (
+                INSERT INTO kaggle_schema.movies (
                     adult, belongs_to_collection, budget, genres, homepage, id, imdb_id,
                     original_language, original_title, overview, popularity, poster_path,
                     production_companies, production_countries, release_date, revenue,
@@ -87,7 +87,7 @@ def import_data(cur):
         print("Data import attempt completed.")
         
         # Check final row count
-        cur.execute("SELECT COUNT(*) FROM patient_iq_schema.movies")
+        cur.execute("SELECT COUNT(*) FROM kaggle_schema.movies")
         final_count = cur.fetchone()[0]
         print(f"Final row count in movies table: {final_count}")
     except Exception as e:
@@ -101,7 +101,7 @@ def main():
         raise ValueError("SUPERUSER_PASSWORD not set in .env file")
 
     conn = psycopg2.connect(
-        dbname="patient_iq",
+        dbname="database",
         user=superuser_name,
         password=superuser_password,
         host="localhost"

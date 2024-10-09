@@ -4,6 +4,7 @@ import re
 import textwrap
 from tee_utils import Tee
 import ast
+import math
 
 column_errors: dict[str, list[str]] = {}
 
@@ -28,20 +29,27 @@ def show_column_stats(df, col, title=""):
         for error in errors:
             print(f"{col}: |{error}|")
     
-# process a string, returning None if the string is empty
+# process a string, returning None if the string is empty or 'nan
 def extract_string(x):
     if x is None:
         return None
-    if isinstance(x, str) and len(x.strip()) > 0:
-        return x.strip()
+    if isinstance(x, str):
+        x = x.strip()
+        if len(x) > 0:
+            if x.lower() == 'nan':
+                return None
+            return x
     return None
 
 def is_string(s):
     return extract_string(s) is not None
 
-# extract an integer from a an integer, float or string
+# attempt to extract an integer from a an integer, float or string
+# return None if the string is empty or cannot be converted to an integer
 def extract_integer(x):
     if x is None:
+        return None
+    if isinstance(x, str) and len(x.strip()) > 0 and x.strip() == 'NaN':
         return None
     if isinstance(x, int):
         return x
@@ -49,6 +57,9 @@ def extract_integer(x):
         x = str(x)
     s = extract_string(x)
     if s is not None:
+        if s.lower() == 'nan':
+            return None
+
         # if s has a decimal point followed by 1 or more zeros, 
         # remove the decimal point and zeros
         match = re.match(r"(\d+)\.0+", s)
@@ -75,6 +86,8 @@ def extract_float(x):
         return x
     s = extract_string(x)
     if s is not None:
+        if s.lower() == 'nan':
+            return None
         try:
             return float(s)
         except ValueError:
@@ -284,27 +297,45 @@ def get_numeric_columns(df):
     
 def get_column_type(col):
     column_type = column_types.get(col)
-    if column_type is None:
+    if column_type is not None:
+        return column_type
+    else:
         raise ValueError(f"no column type found for column:{col}")
-    return column_type
-
+    
 def get_column_dtype(col):
     column_type = get_column_type(col)
-    dtype = column_type_dtypes.get(column_type)
-    if dtype is None:
-        raise ValueError(f"no dtype found for column_type {column_type}")
-    return dtype
+    column_dtype = column_type_dtypes.get(column_type)
+    if column_dtype is not None:
+        return column_dtype
+    else:
+        raise ValueError(f"no column dtype found for column_type:{column_type}")
+
+def get_column_type_extractor(column_type):
+    extractor = column_type_extractors.get(column_type)
+    if extractor is not None:
+        return extractor
+    else:
+        raise ValueError(f"no extractor found for column_type: {column_type}")
+
+def get_column_extractor(col):
+    return get_column_type_extractor(get_column_type(col))
 
 def get_column_names_from_csv_file(csv_path):
     with open(csv_path, "r") as f:
         first_row = f.readline().split(',')
     column_names = [first_row[i].strip() for i in range(len(first_row))]
-    if len(column_names) != len(first_row):
-        raise ValueError("item count failure")                    
+    if column_names is None or len(column_names) != len(first_row):
+        raise ValueError("item count failure")     
     return column_names
 
 def get_column_names_from_df(df):
     return df.columns
+
+def verify_all_columns_have_extractors(df):
+    # a ValueError will be raised on the
+    # first column that has no extractor
+    for col in df.columns:
+        get_column_extractor(col)
 
 def verify_column_names(csv_path, df):
     # raise ValueError if column names don't match
@@ -322,18 +353,6 @@ def verify_column_names(csv_path, df):
                 errors.append(f"i: {csv_columns[i]} != {df_columns[i]}")
         if len(errors) > 0:
             raise ValueError(",".join(errors))
-
-def get_column_extractor(col):
-    extractor = column_type_extractors.get(get_column_type(col))
-    if extractor is None:
-        raise ValueError(f"no extractor found for column: {col}")
-    return extractor
-
-def get_column_type_extractor(column_type):
-    extractor = column_type_extractors.get(column_type)
-    if extractor is None:
-        raise ValueError(f"column_type:{column_type} has no extractor")
-    return extractor
 
 # Function to change the data type of a column
 # def change_column_dtype(df, col):

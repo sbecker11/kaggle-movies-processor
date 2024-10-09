@@ -1,0 +1,94 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug test_is_dict_string",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "test_is_dict_string.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug column_types",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "program": "column_types.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug stat_utils",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "program": "stat_utils.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug clean_movies",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "clean_movies.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug unittest clean_movies_test.py",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "unittest",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "clean_movies_test.py"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug unittest test_column_types.py",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "unittest",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "args": [
+                "test_column_types.py"
+            ],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "debug test_stat_utils",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "unittest",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "args": [
+                "test_stat_utils.py"
+            ]
+        },
+        {
+            "name": "debug test_string_utils",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "unittest",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "args": [
+                "test_string_utils.py"
+            ]
+        }
+    ]
+}

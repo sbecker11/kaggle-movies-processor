@@ -117,7 +117,7 @@ examine the values for the release_date column
 most have format "1970-07-15"
 how many do not have format '\d{4}-\d{2}-\d{2}'
 
-select count(*) from patient_iq_schema.movies 
+select count(*) from kaggle_schema.movies 
 where release_date is not null and 
 release_date::date NOT SIMILAR TO '\d{4}-\d{2}-\d{2}';
 

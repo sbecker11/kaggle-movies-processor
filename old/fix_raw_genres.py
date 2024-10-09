@@ -18,10 +18,10 @@ def clean_and_pad_row(row):
 # update the row in the raw_movies table
 def fix_raw_genres(cur):
     try:
-        cur.execute("SET search_path TO patient_iq_schema, public;")
-        print("Search path set to patient_iq_schema, public before import")
+        cur.execute("SET search_path TO kaggle_schema, public;")
+        print("Search path set to kaggle_schema, public before import")
         
-        cur.execute("SELECT * FROM patient_iq_schema.raw_movies")
+        cur.execute("SELECT * FROM kaggle_schema.raw_movies")
         rows = cur.fetchall()
         print(f"Number of rows in raw_movies table: {len(rows)}")
         
@@ -39,7 +39,7 @@ def fix_raw_genres(cur):
                     cleaned_genres.append(cleaned_genre)
                 cleaned_genres_str = ','.join(cleaned_genres)
                 cur.execute("""
-                    UPDATE patient_iq_schema.raw_movies
+                    UPDATE kaggle_schema.raw_movies
                     SET genres = %s
                     WHERE id = %s
                 """, (cleaned_genres_str, row[5]))
@@ -56,13 +56,13 @@ def fix_raw_genres(cur):
 
 def import_data(cur):
     try:
-        cur.execute("SET search_path TO patient_iq_schema, public;")
-        print("Search path set to patient_iq_schema, public before import")
+        cur.execute("SET search_path TO kaggle_schema, public;")
+        print("Search path set to kaggle_schema, public before import")
         
         create_table_if_not_exists(cur)
 
         # Check if the table is empty
-        cur.execute("SELECT COUNT(*) FROM patient_iq_schema.raw_movies")
+        cur.execute("SELECT COUNT(*) FROM kaggle_schema.raw_movies")
         count = cur.fetchone()[0]
         print(f"Current row count in raw_movies table: {count}")
 
@@ -73,7 +73,7 @@ def import_data(cur):
             print(f"Number of columns in CSV: {len(headers)}")
             
             insert_query = sql.SQL("""
-                INSERT INTO patient_iq_schema.raw_movies (
+                INSERT INTO kaggle_schema.raw_movies (
                     adult, belongs_to_collection, budget, genres, homepage, id, imdb_id,
                     original_language, original_title, overview, popularity, poster_path,
                     production_companies, production_countries, release_date, revenue,
@@ -99,7 +99,7 @@ def import_data(cur):
         print("Data import attempt completed.")
         
         # Check final row count
-        cur.execute("SELECT COUNT(*) FROM patient_iq_schema.raw_movies")
+        cur.execute("SELECT COUNT(*) FROM kaggle_schema.raw_movies")
         final_count = cur.fetchone()[0]
         print(f"Final row count in raw_movies table: {final_count}")
     except Exception as e:
@@ -113,7 +113,7 @@ def main():
         raise ValueError("DB_ADMIN_PASSWORD not set in .env file")
 
     conn = psycopg2.connect(
-        dbname="patient_iq",
+        dbname="database",
         user=user,
         password=pswd,
         host="localhost"

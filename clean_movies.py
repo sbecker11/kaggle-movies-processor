@@ -1,6 +1,7 @@
 import pandas as pd
 import os
-from column_types import process_columns, get_column_type_extractor, is_numeric_column
+from column_types import process_columns, get_column_type, get_column_type_extractor, is_numeric_column, verify_all_columns_have_extractors
+
 import stat_utils
 from plot_utils import plot_column_distribution
 from sklearn.preprocessing import StandardScaler
@@ -73,12 +74,12 @@ def autoscale_numeric_column(df, col, verbose=False):
     if verbose:
         show_column_stats_and_distribution(df, col, title=title+" before scaling")
         
-    # Get the column type extractor
-    column_type_extractor = get_column_type_extractor(col)
+    # Get the column extractor
+    column_extractor = get_column_type_extractor(get_column_type(col))
     
     # Create a column type matcher which retuns a valid value or None
     def column_type_matcher(x):
-        return column_type_extractor(x) is not None
+        return column_extractor(x) is not None
     
     # Create a mask for valid values
     value_mask = df[col].dropna().apply(lambda x: column_type_matcher(x))
@@ -115,21 +116,32 @@ if __name__ == '__main__':
     print(f"Reading from {movies_csv_file} forcing dtype=str")
     df = pd.read_csv("movies.csv", dtype=str, low_memory=False)
     
-    # before doing any cleaning, show the stats of 
-    # of the original dataframe
-    if input("Want to review the dataset stats?") == 'y':
+    # brain check
+    verify_all_columns_have_extractors(df)
+    
+    if input("\nReady to review stats of initial data? (y/n): ") != 'n':
         for col in df.columns:
             show_column_stats(df, col)
+    else:
+        print("Skipped review stats of initial data.")
 
-    if input("Ready to start cleaning the dataset? (y/n): ") == 'y':
+    if input("\nReady to clean the dataset? (y/n): ") != 'n':
         df = clean_movies(df)
+    else:
+        print("\nSkipped clean the dataset.")
+        print("Exiting")
+        exit()
 
-        if input("Want to review the final dataset stats?") == 'y':
-            for col in df.columns:
-                show_column_stats(df, col)
+    if input("\nReady to review stats of cleaned data? (y/n): ") != 'n':
+        for col in df.columns:
+            show_column_stats(df, col)
+    else:
+        print("\nSkipped review stats of cleaned data")
 
-        if input("Ready to save the data (y/n): ") == 'y':
-            print(f"Saving cleaned df to {all_cleaned_csv_path}")
-            df.to_csv(all_cleaned_csv_path, index=False)
-
+    if input("\nReady to save the cleaned data? (y/n): ") != 'n':
+        print(f"Saving cleaned df to {all_cleaned_csv_path}")
+        df.to_csv(all_cleaned_csv_path, index=False)
+    else:
+        print("\nSkipped save the cleaned data")
+        
     print("done")

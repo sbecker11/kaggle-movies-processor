@@ -3,7 +3,7 @@ import numpy as np
 import re
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from column_types import get_column_type, is_numeric_column, get_column_dtype
+from column_types import get_column_type, is_integer, is_float, is_numeric_column, get_column_dtype, get_column_type_extractor
 from tabulate import tabulate
 from decorators import char_decoder
 from string_utils import format_value, Justify
@@ -12,43 +12,21 @@ from string_utils import format_value, Justify
 TABULATE_CHAR_UNCODED = ' '
 TABULETE_CHAR_ENCODED = 'ψ'
 
-def show_dataframe_stats(df, title=""):
+def show_dataframe_stats(cdf, title=""):
     print(f"{'='*80}")
     if title and len(title.strip()) > 0:
         print(title)
-    nrows = len(df)
+    nrows = len(cdf)
     print(f"rows: {nrows}")
-    print(f"cols: {len(df.columns)}")
+    print(f"cols: {len(cdf.columns)}")
     if nrows == 0:
         print("dataframe has zero rows")
         return
     
     # show the first and last 3 rows and columns
-    show_df_grid(df, N=3, val_size=8, col_width=10)
+    show_df_grid(cdf, N=3, val_size=8, col_width=10)
 
-    # drop duplicate rows
-    print("----before drop_duplicate rows")
-    dup_rows_df = find_df_duplicate_rows(df)
-    show_df_grid(dup_rows_df, N=3, val_size=8, col_width=10)
-    
-    df = df.drop(dup_rows_df.index)
-    
-    print("----after drop_duplicate rows")
-    show_df_grid(df, N=3, val_size=8, col_width=10)
-        
-    # drop columns with more than 85% NaN values
-    threshold_perc = 80
-    droppable_columns = get_droppable_columns(df, threshold_perc)
-    print(f"droppable_columns: {droppable_columns}\n")
-    
-    print(f"----before dropping {len(droppable_columns)} columns with NaNs > {threshold_perc}%")
-    show_df_columns_table(df)
-    
-    # Drop the specified columns
-    df = df.drop(columns=droppable_columns)
-    
-    print(f"-----after dropping {len(droppable_columns)} columns with NaNs > {threshold_perc}%")
-    show_df_columns_table(df)
+   
 
 def show_duplicates(df):
     
@@ -201,7 +179,20 @@ def find_df_duplicate_rows(df):
     
     return dup_rows_df
 
-def show_df_columns_table(df):
+def show_column_value_counts(df, col, max_output_lines, not_null=True):
+    try:
+        max_line_length = 20
+        clean_df_col = df[col]
+        if not_null:
+            clean_df_col = clean_df_col.dropna()
+        top_col_value_counts = clean_df_col.value_counts()[:max_output_lines]
+        print(f"Top {max_output_lines} value counts for column: {col}")
+        for i, (value, count) in enumerate(top_col_value_counts.items()):
+            print(f"{i+1:2}. {value[:max_line_length]} : {count}")
+    except KeyError as ke:
+        print(f"KeyError: {ke}")
+
+def show_clean_df_columns_table(df):
     # Define column widths
     col_width = 24
     dtype_width = 10
@@ -235,60 +226,131 @@ def get_column_nan_percent(df, col):
     nan_percent = round(100 * df[col].isna().sum()/nrows)
     return nan_percent
 
-def get_droppable_columns(df, threshold_perc=75):
-    droppable_columns = []
-    for col in df.columns:
-        nan_percent = get_column_nan_percent(df,col)
-        if nan_percent >= threshold_perc:
-            droppable_columns.append(col)
-    return droppable_columns
+# def get_droppable_columns(df, threshold_perc=75):
+#     droppable_columns = []
+#     for col in df.columns:
+#         nan_percent = get_column_nan_percent(df,col)
+#         if nan_percent >= threshold_perc:
+#             droppable_columns.append(col)
+#     return droppable_columns
 
-def show_column_stats(df, col, title="", max_output_lines=10):
+def get_prefiltered_df(df):
+    percent_threshold = 75
+    nan_threshold = percent_threshold * len(df) / 100
+    
+    # drop duplicate rows
+    prefiltered_df = df.drop_duplicates()
+    for col in prefiltered_df.columns:
+        # drop column if it contains more than 75% NaN values
+        if prefiltered_df[col].isna().sum() >= nan_threshold:
+            prefiltered_df = prefiltered_df.drop(columns=[col]) 
+    return prefiltered_df
+
+# Returns a DataFrame with columns
+# that contain only numeric values and
+# None for any non-numeric values.
+#
+# Note that this function should only be used
+# on a pre-filtered-df where duoplicate rows
+# and mostly-null columns have been dropped.
+# 
+def get_numeric_df(pre_filtered_df):
+    numeric_column_values = {}
+    for col in pre_filtered_df.columns:
+        if is_numeric_column(col):
+            column_type = get_column_type(col)
+            column_type_extractor = get_column_type_extractor(column_type)
+            numeric_column_series = pre_filtered_df[col].map(column_type_extractor)
+            numeric_column_values[col] = numeric_column_series
+    numeric_df = pd.DataFrame(numeric_column_values)
+    return numeric_df
+
+def get_non_null_numeric_df(numeric_df):
+    nnn_column_values = {}
+    for col in numeric_df.columns:
+        nnn_column_series = numeric_df[col].dropna()
+        nnn_column_values[col] = nnn_column_series
+    nnn_df = pd.DataFrame(nnn_column_values)
+    return nnn_df
+
+def get_clean_numeric_df(df):
+    pre_filtered_df = get_prefiltered_df(df)
+    numeric_df = get_numeric_df(pre_filtered_df)
+    non_null_numeric_df = get_non_null_numeric_df(numeric_df)
+    return non_null_numeric_df
+
+# works best with a pre-filtered non-null numeric_dataframe.
+# be sure to filter out any null-values in each column
+def show_column_stats(df, col, title="", max_output_lines=10, not_null=True):
     print(f"{'-'*80}")
     dtype = df[col].dtype
     col_type = get_column_type(col)
-    print(f"Column:[{col}] dtype:[{dtype}] column_type[{col_type}]")
-    top_col_value_counts = df[col].value_counts()[:max_output_lines]
-    print(top_col_value_counts)
+    null_perc = df[col].isna().sum() * 100 / len(df)
+    print(f"Column:[{col}] dtype:[{dtype}] column_type[{col_type}] nulls[{null_perc}]%")
+    show_column_value_counts(df, col, max_output_lines, not_null)
 
-    if is_numeric_column(col):
-        mean = df[col].mean()
-        median = df[col].median()
-        mode = df[col].mode().iloc[0]
-        std_dev = df[col].std()
-        skew = df[col].skew()
-        kurtosis = df[col].kurtosis()
-        z_scores = np.abs(stats.zscore(df[col]))
-        min_val = df[col].min()
-        max_val = df[col].max()
-        range_val = max_val - min_val
-        variance = df[col].var()
-        iqr = df[col].quantile(0.75) - df[col].quantile(0.25)
-        missing_count = df[col].isnan().sum()
-        unique_count = df[col].nunique()
 
-        print("Stats:")
-        print(f"  Mean: {mean}")
-        print(f"  Median: {median}")
-        print(f"  Mode: {mode}")
-        print(f"  Standard Deviation: {std_dev}")
-        print(f"  Skewness: {skew}")
-        print(f"  Kurtosis: {kurtosis}")
-        print(f"  Z-scores: {z_scores}")
-        print(f"  Minimum: {min_val}")
-        print(f"  Maximum: {max_val}")
-        print(f"  Range: {range_val}")
-        print(f"  Variance: {variance}")
-        print(f"  Interquartile Range (IQR): {iqr}")
-        print(f"  Missing Values Count: {missing_count}")
-        print(f"  Unique Values Count: {unique_count}")
+def show_clean_column_stats(clean_df, col, title="", max_output_lines=10):
+    if col not in clean_df.columns:
+        raise ValueError(f"Column: {col} not found in clean_df")
+        return
+    clean_df_col = clean_df[col]
+    nan_count = clean_df_col.isna().sum()
+    if nan_count > 0:
+        ValueError(f"Column: {col} has nan_count: {nan_count} > 0")
+        return
+    
+    show_column_stats(clean_df, col, title="", max_output_lines=10)
+    
+    mean = clean_df_col.mean()
+    median = clean_df_col.median()
+    mode = clean_df_col.mode().iloc[0]
+    std_dev = clean_df_col.std()
+    skew = clean_df_col.skew()
+    kurtosis = clean_df_col.kurtosis()
+    z_scores = np.abs(stats.zscore(clean_df_col))
+    min_val = clean_df_col.min()
+    max_val = clean_df_col.max()
+    range_val = max_val - min_val
+    variance = clean_df_col.var()
+    iqr = clean_df_col.quantile(0.75) - clean_df_col.quantile(0.25)
+    unique_count = clean_df_col.nunique()
+
+    print("Stats:")
+    print(f"  Mean: {mean}")
+    print(f"  Median: {median}")
+    print(f"  Mode: {mode}")
+    print(f"  Standard Deviation: {std_dev}")
+    print(f"  Skewness: {skew}")
+    print(f"  Kurtosis: {kurtosis}")
+    print(f"  Z-scores: {z_scores}")
+    print(f"  Minimum: {min_val}")
+    print(f"  Maximum: {max_val}")
+    print(f"  Range: {range_val}")
+    print(f"  Variance: {variance}")
+    print(f"  Interquartile Range (IQR): {iqr}")
+    print(f"  Unique Values Count: {unique_count}")
 
 # Compare the effect of different scalers on the data of the given numeric column in the DataFrame
-def compare_numeric_scalers(df, col, threshold=3):
+def compare_numeric_scalers(cdf, column_pair,  threshold=3):
+    if len(column_pair) != 2:
+        ValueError("column_pair must contain two columns")
+        return
+    col1, col2 = column_pair
+    if col1 not in cdf.columns or col2 not in cdf.columns:
+        ValueError(f"Column: {col1} or {col2} not found in cdf")
+        return
+    
+    for col in column_pair:
+        clean_col_series = cdf[col]
+        if clean_col_series.isna().sum() > 0:
+            ValueError(f"Column: {col} has nan_count > 0")
+            return
+
     # Step 1: Apply StandardScaler
     standard_scaler = StandardScaler()
     df_standard_scaled = pd.DataFrame(
-        standard_scaler.fit_transform(df), columns=df.columns)
+        standard_scaler.fit_transform(cdf), column_pair)
 
     # Step 2: Apply Clamp or Drop Outliers
     df_standard_scaled_clamped = df_standard_scaled.clip(
@@ -299,12 +361,12 @@ def compare_numeric_scalers(df, col, threshold=3):
     # Step 3: Apply MinMaxScaler
     min_max_scaler = MinMaxScaler()
     df_min_max_scaled_clamped = pd.DataFrame(min_max_scaler.fit_transform(
-        df_standard_scaled_clamped), columns=df.columns)
+        df_standard_scaled_clamped), columns=cdf.columns[column_pair])
     df_min_max_scaled_dropped = pd.DataFrame(min_max_scaler.fit_transform(
-        df_standard_scaled_dropped), columns=df.columns)
+        df_standard_scaled_dropped), columns=df.columns[column_pair])
 
     # Print results
-    show_column_stats(df, col + ' (Original):')
+    show_column_stats(cdf, col + ' (Original):')
     show_column_stats(df_standard_scaled_clamped, col +
                       " (Standard Scaled Data (Clamped):")
     show_column_stats(df_min_max_scaled_clamped, col +
@@ -316,5 +378,5 @@ def compare_numeric_scalers(df, col, threshold=3):
 
 if __name__ == '__main__':
     df = pd.read_csv("movies.csv")
-    
-    show_dataframe_stats(df)
+    cdf = get_clean_numeric_df(df)
+    show_dataframe_stats(cdf)
