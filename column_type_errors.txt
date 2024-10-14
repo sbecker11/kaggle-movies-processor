@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
-process_columns run started at: 2024-10-09T00:55:33.821889
+process_columns run started at: 2024-10-14T15:35:51.492961
 
 Skipped columns: ['imdb_id', 'original_language', 'original_title', 'poster_path', 'revenue', 'runtime', 'status', 'title', 'video', 'vote_average', 'vote_count']
 
@@ -39,5 +39,5 @@ release_date: error: 3/3 >|22|<
 Column: [spoken_languages] [list_of_dict] has 1 errors
 spoken_languages: error: 1/1 >|[]|<
 
-process_columns run finished at: 2024-10-09T00:55:33.825501
+process_columns run finished at: 2024-10-14T15:35:51.494259
 

@@ -1,12 +1,10 @@
 import pandas as pd
 import os
-from column_types import process_columns, get_column_type, get_column_type_extractor, is_numeric_column, verify_all_columns_have_extractors
+from column_types import process_columns, verify_all_columns_have_extractors
 
-import stat_utils
 from plot_utils import plot_column_distribution
-from sklearn.preprocessing import StandardScaler
 from env_utils import reload_dotenv 
-from stat_utils import show_column_stats
+from stat_utils import show_column_stats, get_normalized_df
  
 reload_dotenv()
 
@@ -45,61 +43,15 @@ def clean_movies(df):
     # or None if conversion is not possible, for example if the value
     # is a string that cannot be converted to a float.
     df = process_columns(df)
-    
-    df = autoscale_numeric_columns(df, verbose=True)
-    
+        
     print(f"clean_movies finished with rows: {len(df)} columns: {len(df.columns)}")   
 
     # Return the cleansed df for further investigation
     return df
 
-def autoscale_numeric_columns(df, verbose=False):
-    for col in df.columns:
-        if is_numeric_column(col):
-            df = autoscale_numeric_column(df, col, verbose=verbose)            
-
 def show_column_stats_and_distribution(df, col, title=""):
-    stat_utils.show_column_stats(df, col, title=title)
+    show_column_stats(df, col, title=title)
     plot_column_distribution(df, col, title=title)
-
-def autoscale_numeric_column(df, col, verbose=False):
-    # use the column type extractor to identify valid values
-    # apply StandardScaler to the valid values
-    # reinsert the scaled values back into the DataFrame
-    # return the DataFrame with the scaled column
-    # includes option to show stats and distribution
-    # before and after scaling
-    
-    title = "Column:{col} stats and distribution"
-    if verbose:
-        show_column_stats_and_distribution(df, col, title=title+" before scaling")
-        
-    # Get the column extractor
-    column_extractor = get_column_type_extractor(get_column_type(col))
-    
-    # Create a column type matcher which retuns a valid value or None
-    def column_type_matcher(x):
-        return column_extractor(x) is not None
-    
-    # Create a mask for valid values
-    value_mask = df[col].dropna().apply(lambda x: column_type_matcher(x))
-    
-    # Extract valid values
-    valid_values = df[col].dropna()[value_mask]
-    
-    # Apply StandardScaler to valid values
-    scaler = StandardScaler()
-    scaled_values = scaler.fit_transform(valid_values.values.reshape(-1, 1))
-    
-    # Reinsert scaled values back into the DataFrame
-    df.loc[valid_values.index, col] = scaled_values
-    
-    if verbose:
-        show_column_stats_and_distribution(df, col, title=title+" after scaling")
-
-    # return the DataFrame with the scaled column
-    return df
-    
 
 if __name__ == '__main__':
     # Read the CSV file into a Pandas DataFrame
@@ -111,6 +63,7 @@ if __name__ == '__main__':
     movie_outputs_path = os.getenv('MOVIES_OUTPUTS_PATH')
     if not movie_outputs_path:
         raise ValueError("MOVIES_OUTPUTS_PATH environment variable is not set")
+    all_normalized_csv_path = os.path.join(movie_outputs_path, "all_normalized.csv")
     all_cleaned_csv_path = os.path.join(movie_outputs_path, "all_cleaned.csv")
     
     print(f"Reading from {movies_csv_file} forcing dtype=str")
@@ -119,29 +72,52 @@ if __name__ == '__main__':
     # brain check
     verify_all_columns_have_extractors(df)
     
-    if input("\nReady to review stats of initial data? (y/n): ") != 'n':
+    if input("\nReady to review stats and distribution of initial data? (y/n): ") != 'n':
         for col in df.columns:
-            show_column_stats(df, col)
+            show_column_stats_and_distribution(df, col)
     else:
-        print("Skipped review stats of initial data.")
+        print("Skipped review stats and distributions of initial data.")
 
+    cleaned_df = None
     if input("\nReady to clean the dataset? (y/n): ") != 'n':
-        df = clean_movies(df)
+        cleaned_df = clean_movies(df)
     else:
         print("\nSkipped clean the dataset.")
         print("Exiting")
         exit()
 
-    if input("\nReady to review stats of cleaned data? (y/n): ") != 'n':
-        for col in df.columns:
-            show_column_stats(df, col)
+    if cleaned_df is not None:
+        if input("\nReady to review stats of cleaned data? (y/n): ") != 'n':
+            for col in df.columns:
+                show_column_stats(df, col)
+        else:
+            print("\nSkipped review stats of cleaned data")
+        
+    if cleaned_df is not None:
+        if input(f"\nReady to save the cleaned (not normalized) data to {all_cleaned_csv_path}? (y/n): ") != 'n':
+            print(f"Saving cleaned df to {all_cleaned_csv_path}")
+            df.to_csv(all_cleaned_csv_path, index=False)
+        else:
+            print("\nSkipped save the cleaned data")
     else:
-        print("\nSkipped review stats of cleaned data")
+        exit("cleaned_df is None. Exiting")
 
-    if input("\nReady to save the cleaned data? (y/n): ") != 'n':
-        print(f"Saving cleaned df to {all_cleaned_csv_path}")
-        df.to_csv(all_cleaned_csv_path, index=False)
+    norm_df = None
+    if input("\nReady to normalize the cleaned data? (y/n): ") != 'n':
+        norm_df = get_normalized_df(df)
     else:
-        print("\nSkipped save the cleaned data")
+        exit("no normalization requested. Exiting")
+
+    if input("\nReady to view column stats and distributions of normalized data? (y/n): ") != 'n':
+        for col in norm_df.columns:
+            show_column_stats_and_distribution(norm_df, col)
+    else:
+        print("\nSkipped review column stats and distributions of normalized data")
+            
+    if input(f"\nReady to save the normalized data to {all_normalized_csv_path}? (y/n): ") != 'n':
+        print(f"Saving normalized df to {all_normalized_csv_path}")
+        norm_df.to_csv(all_normalized_csv_path, index=False)
+    else:
+        print("\nSkipped save the normalized data")
         
     print("done")

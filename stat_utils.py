@@ -3,15 +3,17 @@ import numpy as np
 import re
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from column_types import get_column_type, is_integer, is_float, is_numeric_column, get_column_dtype, get_column_type_extractor
+from column_types import get_column_type, is_numeric_column_type, is_float_column_type, get_column_type_extractor, is_numeric, is_integer, is_float
 from tabulate import tabulate
 from decorators import char_decoder
 from string_utils import format_value, Justify
+
 # from string_utils import print_wrapped_list
 
 TABULATE_CHAR_UNCODED = ' '
 TABULETE_CHAR_ENCODED = 'ψ'
 
+# wrapper for show_df_grid
 def show_dataframe_stats(cdf, title=""):
     print(f"{'='*80}")
     if title and len(title.strip()) > 0:
@@ -25,27 +27,6 @@ def show_dataframe_stats(cdf, title=""):
     
     # show the first and last 3 rows and columns
     show_df_grid(cdf, N=3, val_size=8, col_width=10)
-
-   
-
-def show_duplicates(df):
-    
-    dups_mask = df.duplicated(subset=['id', 'title'], keep=False)
-
-    # Use the mask and keep the 'id' and 'title' columns of duplicate rows
-    df = df.loc[dups_mask, ['id', 'title']]
-
-    # Add the count of rows for each grouping of id
-    df['count'] = df.groupby('id')['id'].transform('count')
-
-    # Add a rank column for each grouping of id using the rank method
-    df['rank'] = df.groupby('id').cumcount() + 1
-    
-    # # Keep only rows with rank 1
-    df = df[df['rank'] == 1].drop(columns=['rank'])
-    
-    print("\nkeeping only rows with rank=1 and dropping rank column")
-    print(df)
 
 # uses  
 # TABULATE_CHAR_ENCODED in place of 
@@ -80,9 +61,12 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     # Make a copy of the DataFrame to avoid modifying the original
     dff = df.copy()
     
-    # rename the column names to fit within the specified column width
+    # rename the column names to fit within the specified column width 
+    # and set detypes to object so mixed types are allowed
     cols = dff.columns.tolist()
     for col in dff.columns:
+        print(f"DEBUG: col: {col}")
+        dff[col] = dff[col].astype('object')
         dff.rename(columns={col: format_value(col, val_size, col_width, justify=Justify.CENTER)}, inplace=True)
     cols = dff.columns.tolist()
 
@@ -153,33 +137,15 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     btm_half_lines = btm_half_pre_table.split('\n')
     btm_half_table = '\n'.join(btm_half_lines[3:]) 
     print(btm_half_table)
-
     
-def find_df_duplicate_rows(df):
-    
-    if 'id' not in df.columns or 'title' not in df.columns:
-        raise ValueError("DataFrame must contain 'id' and 'title' columns")
-
-    # Find duplicate rows and keep the id and title columns
-    dups_mask = df.duplicated(subset=['id', 'title'], keep=False)
-
-    # Use the mask and keep the 'id' and 'title' columns of duplicate rows
-    dup_rows_df = df.loc[dups_mask, ['id', 'title']]
-
-    # Use tranform('count') to add a new 'count' with the same value for each row in the group
-    # other group tranform methods include: size, sum, mean, std, var, min, max, median, nunique, first, last
-    dup_rows_df['count'] = dup_rows_df.groupby('id')['id'].transform('count')
-
-    # Add a rank column for each grouping of id using the cumcount() group method
-    # comcount starts at 0, so add 1 to get the rank
-    dup_rows_df['rank'] = dup_rows_df.groupby('id').cumcount() + 1
-
-    # Keep only rows with rank 1 and drop the rank
-    dup_rows_df = dup_rows_df[dup_rows_df['rank'] == 1].drop(columns=['rank'])
-    
-    return dup_rows_df
-
+# used by show_column, show_column_stats, and show_column_value_counts
+# max_output_lines is the maximum number of lines to output
+# not_null is a flag to indicate whether to include null values
+# floats are not subscriptable, so they are skipped
 def show_column_value_counts(df, col, max_output_lines, not_null=True):
+    if is_float_column_type(col):
+        print("show_column_value_counts skipping unsubscriptable float column value counts where quantizing is required")
+        return
     try:
         max_line_length = 20
         clean_df_col = df[col]
@@ -192,49 +158,10 @@ def show_column_value_counts(df, col, max_output_lines, not_null=True):
     except KeyError as ke:
         print(f"KeyError: {ke}")
 
-def show_clean_df_columns_table(df):
-    # Define column widths
-    col_width = 24
-    dtype_width = 10
-    col_type_width = 20
-    unique_cnt_width = 5
-    nan_perc_width = 5
-    num_cols = 5
-    total_width = col_width + dtype_width + col_type_width + unique_cnt_width + nan_perc_width + num_cols
-    
-    print(f"{'Column':<{col_width}} {'Dtype':<{dtype_width}} {'Column Type':<{col_type_width}} {'Uniques':<{unique_cnt_width}} {'% NaNs':<{nan_perc_width}} ")
-    print('-' * total_width)
-
-    for col in df.columns:
-        #  natural_dtype = str(df[col].dtype)
-        dtype = get_column_dtype(col)
-        col_type = get_column_type(col)
-        nunique_cnt = df[col].nunique(dropna=True)
-        nan_percent = get_column_nan_percent(df, col)
-        print(f"{col:<{col_width}} {dtype:<{dtype_width}} {col_type:<{col_type_width}} {nunique_cnt:>{unique_cnt_width}}  {nan_percent:>{nan_perc_width}} ")
-    print('-' * total_width)
-    print()
-
-def get_dtype_spec(df):
-    dtype_spec = {}
-    for col in df.columns:
-        dtype_spec[col] = get_column_dtype(col)
-    return dtype_spec
-
-def get_column_nan_percent(df, col):
-    nrows = len(df)
-    nan_percent = round(100 * df[col].isna().sum()/nrows)
-    return nan_percent
-
-# def get_droppable_columns(df, threshold_perc=75):
-#     droppable_columns = []
-#     for col in df.columns:
-#         nan_percent = get_column_nan_percent(df,col)
-#         if nan_percent >= threshold_perc:
-#             droppable_columns.append(col)
-#     return droppable_columns
-
 def get_prefiltered_df(df):
+    # returns a dataframe with duplicate rows removed
+    # and columns with more than 75% NaN values removed
+    
     percent_threshold = 75
     nan_threshold = percent_threshold * len(df) / 100
     
@@ -257,7 +184,11 @@ def get_prefiltered_df(df):
 def get_numeric_df(pre_filtered_df):
     numeric_column_values = {}
     for col in pre_filtered_df.columns:
-        if is_numeric_column(col):
+        if is_numeric_column_type(col):
+            num_non_numeric_values = find_non_numeric_values(pre_filtered_df, col, verbose=False)
+            if len(num_non_numeric_values) > 0:
+                print(f"get_numeric_df skipping column: {col} with {len(num_non_numeric_values)} non-numeric values")
+                continue
             column_type = get_column_type(col)
             column_type_extractor = get_column_type_extractor(column_type)
             numeric_column_series = pre_filtered_df[col].map(column_type_extractor)
@@ -265,6 +196,8 @@ def get_numeric_df(pre_filtered_df):
     numeric_df = pd.DataFrame(numeric_column_values)
     return numeric_df
 
+# Returns a DataFrame with columns'
+# that have only non-null numeric values
 def get_non_null_numeric_df(numeric_df):
     nnn_column_values = {}
     for col in numeric_df.columns:
@@ -279,6 +212,12 @@ def get_clean_numeric_df(df):
     non_null_numeric_df = get_non_null_numeric_df(numeric_df)
     return non_null_numeric_df
 
+def get_normalized_df(df):
+    clean_df = get_clean_numeric_df(df)
+    normalized_df = autoscale_numeric_columns(clean_df)
+    return normalized_df
+
+
 # works best with a pre-filtered non-null numeric_dataframe.
 # be sure to filter out any null-values in each column
 def show_column_stats(df, col, title="", max_output_lines=10, not_null=True):
@@ -287,7 +226,97 @@ def show_column_stats(df, col, title="", max_output_lines=10, not_null=True):
     col_type = get_column_type(col)
     null_perc = df[col].isna().sum() * 100 / len(df)
     print(f"Column:[{col}] dtype:[{dtype}] column_type[{col_type}] nulls[{null_perc}]%")
-    show_column_value_counts(df, col, max_output_lines, not_null)
+
+    if is_float_column_type(col):
+        print("skipping float column value counts where quantizing is required")
+    else:
+        show_column_value_counts(df, col, max_output_lines, not_null)
+
+def find_integer_values(df, col):
+    integer_values = df[col][df[col].apply(is_integer)]
+    return integer_values
+
+def find_float_values(df, col):
+    float_values = df[col][df[col].apply(is_float)]
+    return float_values
+
+# Return a possibly empty list of non-numeric values 
+# of type 'object' from the DataFrame
+def find_non_numeric_values(df, col):
+    non_numeric_values = df[col][~df[col].apply(is_numeric)]
+    return non_numeric_values
+
+# Return true if the column values are all numeric
+# with optional verbose output
+def verify_column_values_are_numeric(df, col, verbose=False):
+    non_numeric_values = find_non_numeric_values(df, col)
+    num_non_numeric_values = len(non_numeric_values)
+    if num_non_numeric_values > 0 and not verbose:
+        return False
+    show_num_values = min(5, num_non_numeric_values)
+    top_unique_values = non_numeric_values.value_counts().head(show_num_values)
+    if verbose:
+        print(f"column {col}:")
+        print(f" num_non_numeric_values: {num_non_numeric_values}")
+        print(f" top {len(top_unique_values)} non_numeric_values:")
+        for value, count in top_unique_values.items():
+            print(f"  {value}: {count}")
+        if num_non_numeric_values > 0:
+            print(f"  skipping plot_column_distribution for column {col} because it has non-numeric values")
+    return num_non_numeric_values == 0
+
+# Autoscale all numeric columns in a DataFrame
+# any non-numerical columns will be ignored
+def autoscale_numeric_columns(df, verbose=False):
+    for col in df.columns:
+        if is_numeric_column_type(col):
+            df = autoscale_numeric_column(df, col, verbose=verbose)
+    return df         
+
+def autoscale_numeric_column(df, col, verbose=False):
+    # use the column type extractor to identify valid values
+    # apply StandardScaler to the valid values
+    # reinsert the scaled values back into the DataFrame
+    # return the DataFrame with the scaled column
+    # includes option to show stats and distribution
+    # before and after scaling. If the column is not numeric
+    # the function will return the DataFrame as is
+    num_non_numeric_values = len(find_non_numeric_values(df, col, verbose=verbose))
+    if num_non_numeric_values > 0:
+        if verbose:
+            print(f"autoscale_numeric_column skipping column: {col} with {num_non_numeric_values} non-numeric values")   
+        return df
+    
+    title = "Column:{col} stats and distribution"
+    if verbose:
+        show_column_stats(df, col, title=title+" before scaling")
+        
+    # Get the column extractor
+    column_extractor = get_column_type_extractor(get_column_type(col))
+    
+    # Create a column type matcher which retuns a valid value or None
+    def column_type_matcher(x):
+        return column_extractor(x) is not None
+    
+    # Create a mask for valid values
+    value_mask = df[col].dropna().apply(lambda x: column_type_matcher(x))
+    
+    # Extract valid values
+    valid_values = df[col].dropna()[value_mask]
+    
+    # Apply StandardScaler to valid values
+    scaler = StandardScaler()
+    scaled_values = scaler.fit_transform(valid_values.values.reshape(-1, 1))
+    
+    # Reinsert scaled values back into the DataFrame
+    df.loc[valid_values.index, col] = scaled_values
+    
+    if verbose:
+        show_column_stats(df, col, title=title+" after scaling")
+
+    # return the DataFrame with the scaled column
+    return df
+    
 
 
 def show_clean_column_stats(clean_df, col, title="", max_output_lines=10):
@@ -377,6 +406,6 @@ def compare_numeric_scalers(cdf, column_pair,  threshold=3):
                       " (MinMax Scaled Data (Dropped):")
 
 if __name__ == '__main__':
-    df = pd.read_csv("movies.csv")
+    df = pd.read_csv("movies.csv", low_memory=False)
     cdf = get_clean_numeric_df(df)
     show_dataframe_stats(cdf)

@@ -4,7 +4,6 @@ import re
 import textwrap
 from tee_utils import Tee
 import ast
-import math
 
 column_errors: dict[str, list[str]] = {}
 
@@ -96,6 +95,9 @@ def extract_float(x):
 
 def is_float(s):
     return extract_float(s) is not None
+
+def is_numeric(s):
+    return is_integer(s) or is_float(s)
 
 # extract a boolean from a boolean or a string
 def extract_boolean(x):
@@ -287,13 +289,18 @@ column_types = {
     "vote_count": "integer"
 }
 
-def is_numeric_column(col):
+def is_float_column_type(col):
+    if get_column_type(col) == "float":
+        return True
+    return False
+
+def is_numeric_column_type(col):
     if get_column_type(col) in numeric_column_types:
         return True
     return False
 
 def get_numeric_columns(df):
-    return [col for col in df.columns if is_numeric_column(col)]
+    return [col for col in df.columns if is_numeric_column_type(col)]
     
 def get_column_type(col):
     column_type = column_types.get(col)
