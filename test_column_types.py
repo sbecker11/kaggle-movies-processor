@@ -1,4 +1,4 @@
-from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime
+from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime, cast_to_string, cast_to_boolean, cast_to_float, cast_to_integer, process_columns, verify_all_columns_have_extractors
 from unittest import TestCase
 import pandas as pd
 
@@ -166,4 +166,80 @@ class TestColumnTypes(TestCase):
         y = extract_ymd_datetime(x)
         self.assertIsNone(y, "Error should have returned None since length != 10 chars")
 
+    def test_cast_all_values_to_float(self):
+        input_data = {
+            'A': ['1', '2', 'a'],
+            'B': ['4.5', True, 'b'],
+            'C': ['7', 'false', 'c']
+        }
+        expected_data = {
+            'A': [1.0, 2.0, None],
+            'B': [4.5, None, None],
+            'C': [7.0, None, None]
+        }
+        error_message = self.print_and_compare("make all values float", input_data, expected_data, cast_to_float)
+        if error_message:
+            self.fail(error_message)
+    
+    def test_cast_all_values_to_boolean(self):
+        input_data = {
+            'A': ['true', 'FALSE', 'a'],
+            'B': ['4.5', '5.6', True],
+            'C': ['7', '8', False]
+        }
+        expected_data = {
+            'A': [True, False, None],
+            'B': [None, None, True],
+            'C': [None, None, False]
+        }
+        error_message = self.print_and_compare("test_cast_all_values_to_booleans", input_data, expected_data, cast_to_boolean)
+        if error_message:
+            self.fail(error_message)
 
+    def test_cast_all_values_to_integer(self):
+        input_data = {
+            'A': ['1', '2', 'a'],
+            'B': ['4.5', True, 'b'],
+            'C': ['7', '8', 'c']
+        }
+        expected_data = {
+            'A': [1, 2, None],
+            'B': [5, None, None],
+            'C': [7, 8, None]
+        }
+        error_message = self.print_and_compare("test_cast_all_values_to_integers", input_data, expected_data, cast_to_integer)
+        if error_message:
+            self.fail(error_message)
+            
+    def test_cast_all_values_to_string(self):
+        input_data = {
+            'A': [1, '2', '{"a": 7}' ],
+            'B': ['happy', 'day\s', '[{"b": 8},{"c": 9}]' ],
+            'C': [7, True, '(1,2,3)']
+        }
+        expected_data = {
+            'A': ['1', '2', '{"a": 7}' ],
+            'B': ['happy', 'day\s', '[{"b": 8},{"c": 9}]' ],
+            'C': ['7', 'True', '(1,2,3)']
+        }
+        error_message = self.print_and_compare("test_cast_all_values_to_strings", input_data, expected_data, cast_to_string)
+        if error_message:
+            self.fail(error_message)
+
+    def print_and_compare(self, test_name, input_data, expected_data, converter):
+        print('-' * 80)
+        print(test_name)
+        df_input = pd.DataFrame(input_data)
+        print("df_input:")
+        print(df_input)
+        df_result = df_input.map(converter)
+        print("df_result:")
+        print(df_result)
+        df_expected = pd.DataFrame(expected_data)
+        print("df_expected:")
+        print(df_expected)
+        result = df_result.equals(df_expected)
+        if result is False:
+            return(f"Error: {test_name} failed")
+        else:
+            return None

@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from column_types import get_numeric_columns, get_column_type_extractor
 from sklearn.preprocessing import StandardScaler
-from stat_utils import find_non_numeric_values, find_integer_values, find_float_values
+from stat_utils import find_non_numeric_value_counts, find_integer_values, find_float_values, print_top_skipped_value_counts
 
 
 # Show a matrix of histograms for pairs of numeric columns
@@ -51,9 +51,9 @@ def show_scatter_and_density(df):
 # does not handle other numeric dtypes, e.g. int16, float32 etc.
 # does not first check to see if column's dtype is already int64 or float64
 def set_numeric_column_dtype(df, col):
-    num_non_numeric_values = len(find_non_numeric_values(df, col))
+    num_non_numeric_values = len(find_non_numeric_value_counts(df, col))
     if num_non_numeric_values > 0:
-        print(f"WARNING: set_numeric_column_dtype skipping column '{col}' has {num_non_numeric_values} non-numeric values.")
+        print(f"WARNING: set_numeric_column_dtype skipping column: '{col}' has {num_non_numeric_values} non-numeric values.")
         return df
     num_rows = len(df)
     num_integer_values = len(find_integer_values(df, col))
@@ -65,16 +65,23 @@ def set_numeric_column_dtype(df, col):
     elif num_float_values == num_rows:
         df[col] = df[col].astype('float64')
     else:
-        raise ValueError(f"plot_column_distribution - column '{col}' has {num_integer_values} integer values and {num_float_values} float values.")
+        raise ValueError(f"plot_column_distribution - column: '{col}' has {num_integer_values} integer values and {num_float_values} float values.")
     
     return df
 
+def can_plot_column_distribution(df, col):
+    non_numeric_value_counts = find_non_numeric_value_counts(df, col)
+    if len(non_numeric_value_counts) > 0:
+        print_top_skipped_value_counts("plot_column_distribution", col, "non-numeric", non_numeric_value_counts)
+        input("Hit any key to continue: ")
+        return False
+    return True
 
 def plot_column_distribution(df, col, title="", mean=None, stddev=None, scale_factor=1):
-    
-    num_non_numeric_values = len(find_non_numeric_values(df, col))
-    if num_non_numeric_values > 0:
-        print(f"plot_column_distribution skipping column '{col}' has {num_non_numeric_values} non-numeric values.")
+    non_numeric_value_counts = find_non_numeric_value_counts(df, col)
+    if len(non_numeric_value_counts) > 0:
+        print_top_skipped_value_counts("plot_column_distribution", col, "non-numeric", non_numeric_value_counts)
+        input("Hit any key to continue: ")
         return
         
     df = set_numeric_column_dtype(df, col)
@@ -85,7 +92,7 @@ def plot_column_distribution(df, col, title="", mean=None, stddev=None, scale_fa
         stddev = df[col].std()
 
     # Create histogram using plotly.express
-    fig = px.histogram(df, x=col, histnorm='probability density', nbins=30, title=f'{title} Distribution of column: {col}')
+    fig = px.histogram(df, x=col, histnorm='probability density', nbins=30, title=f"{title} Distribution of Column: '{col}'")
     
     # Calculate PDF
     x = np.linspace(df[col].min(), df[col].max(), 1000)
@@ -96,7 +103,8 @@ def plot_column_distribution(df, col, title="", mean=None, stddev=None, scale_fa
     fig.add_trace(pdf_trace)
     
     # Update layout
-    fig.update_layout(title_text=f'{title} Distribution of column: {col}')
+    fig.update_layout(title_text=f"{title} Distribution of column: '{col}'")
+    fig.show()
     
     plt.ion()
     if input("hit any key to continue: "):
@@ -155,7 +163,7 @@ def autoscale_numeric_column(df, col, verbose=False):
     df.loc[valid_values.index, col] = scaled_values
     
     if verbose:
-        print(f"Column '{col}' has been autoscaled.")
+        print(f"column: '{col}' has been autoscaled.")
     return df
 
 
@@ -176,7 +184,7 @@ if __name__ == '__main__':
         
         numeric_cols = get_numeric_columns(df)
         for col in numeric_cols:
-            if input(f"Want to prepare column {col} for scaling? y/n:") != 'n':
+            if input(f"Want to prepare column: '{col}' for scaling? y/n:") != 'n':
                 df = autoscale_numeric_column(df, col, verbose=True)
                 
             plot_column_distribution(df, col, title='Real Movies Data')

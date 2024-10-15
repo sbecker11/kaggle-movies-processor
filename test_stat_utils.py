@@ -19,7 +19,7 @@ class TestStatUtils(TestCase):
         
         for col in df.columns:
             top_3_col_title_counts = df[col].title_counts()[:12]
-            print(f"Column:{col} top 3 unique title_counts:")
+            print(f"Column: '{col}' top 3 unique title_counts:")
             print(top_3_col_title_counts)
 
     def test_column_names(self):

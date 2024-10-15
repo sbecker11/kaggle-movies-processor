@@ -3,7 +3,7 @@ import numpy as np
 import re
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from column_types import get_column_type, is_numeric_column_type, is_float_column_type, get_column_type_extractor, is_numeric, is_integer, is_float
+from column_types import get_column_type, is_numeric_column_type, is_float_column_type, get_column_type_extractor, is_numeric, is_integer, is_float, get_cplumn_errors, save_column_errors
 from tabulate import tabulate
 from decorators import char_decoder
 from string_utils import format_value, Justify
@@ -65,7 +65,7 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     # and set detypes to object so mixed types are allowed
     cols = dff.columns.tolist()
     for col in dff.columns:
-        print(f"DEBUG: col: {col}")
+        print(f"DEBUG: column: '{col}'")
         dff[col] = dff[col].astype('object')
         dff.rename(columns={col: format_value(col, val_size, col_width, justify=Justify.CENTER)}, inplace=True)
     cols = dff.columns.tolist()
@@ -137,7 +137,23 @@ def show_df_grid(df, N=5, val_size=8, col_width=10, show_index=True):
     btm_half_lines = btm_half_pre_table.split('\n')
     btm_half_table = '\n'.join(btm_half_lines[3:]) 
     print(btm_half_table)
-    
+
+def show_all_column_stats(df):
+    for col in df.columns:
+        show_column_stats(df, col)
+
+def show_column_stats(df, col, title=""):
+    print(f"Column: '{col}' Stats: {title}")
+    print(df[col].describe())
+    print(f"Number of unique values: {df[col].notnull().nunique()}")
+    errors = column_errors.get(col)
+    num_errors = 0 if errors is None else len(errors)
+    print(f"Column: '{col}' has {num_errors} extraction errors")
+    if num_errors > 0:
+        for error in errors:
+            print(f"{col}: |{error}|")
+            
+            
 # used by show_column, show_column_stats, and show_column_value_counts
 # max_output_lines is the maximum number of lines to output
 # not_null is a flag to indicate whether to include null values
@@ -152,7 +168,7 @@ def show_column_value_counts(df, col, max_output_lines, not_null=True):
         if not_null:
             clean_df_col = clean_df_col.dropna()
         top_col_value_counts = clean_df_col.value_counts()[:max_output_lines]
-        print(f"Top {max_output_lines} value counts for column: {col}")
+        print(f"Top {max_output_lines} value counts for column: '{col}'")
         for i, (value, count) in enumerate(top_col_value_counts.items()):
             print(f"{i+1:2}. {value[:max_line_length]} : {count}")
     except KeyError as ke:
@@ -185,9 +201,9 @@ def get_numeric_df(pre_filtered_df):
     numeric_column_values = {}
     for col in pre_filtered_df.columns:
         if is_numeric_column_type(col):
-            num_non_numeric_values = find_non_numeric_values(pre_filtered_df, col, verbose=False)
+            num_non_numeric_values = find_non_numeric_value_counts(pre_filtered_df, col, verbose=False)
             if len(num_non_numeric_values) > 0:
-                print(f"get_numeric_df skipping column: {col} with {len(num_non_numeric_values)} non-numeric values")
+                print(f"get_numeric_df skipping column: '{col}' with {len(num_non_numeric_values)} non-numeric values")
                 continue
             column_type = get_column_type(col)
             column_type_extractor = get_column_type_extractor(column_type)
@@ -231,6 +247,7 @@ def show_column_stats(df, col, title="", max_output_lines=10, not_null=True):
         print("skipping float column value counts where quantizing is required")
     else:
         show_column_value_counts(df, col, max_output_lines, not_null)
+    input("Hit any key to continue...")
 
 def find_integer_values(df, col):
     integer_values = df[col][df[col].apply(is_integer)]
@@ -242,28 +259,35 @@ def find_float_values(df, col):
 
 # Return a possibly empty list of non-numeric values 
 # of type 'object' from the DataFrame
-def find_non_numeric_values(df, col):
-    non_numeric_values = df[col][~df[col].apply(is_numeric)]
-    return non_numeric_values
+def find_non_numeric_value_counts(df, col):
+    non_numeric_value_counts = df[col][~df[col].apply(is_numeric)].value_counts()
+    return non_numeric_value_counts
+
+def print_top_skipped_value_counts( funcName, col, skipped_reason, skipped_value_counts):
+    if skipped_value_counts is None or len(skipped_value_counts) == 0:
+        return
+    if type(skipped_value_counts) is not pd.Series:
+        raise ValueError(f"skipped_value_counts must be a pandas Series, not a {type(skipped_value_counts)}")
+    num_skipped_value_counts = len(skipped_value_counts)
+    if num_skipped_value_counts > 0:
+        prefix = f"'{funcName}' skipping " if funcName and len(funcName.strip()) > 0 else "Skipping"
+        print(f"{prefix}Column: '{col}' num total {skipped_reason} values: {num_skipped_value_counts}")
+        top_unique_value_counts = skipped_value_counts.sort_values(ascending=False).head(5)
+        num_top_unique_values = len(top_unique_value_counts)
+        print(f"Top {num_top_unique_values} {skipped_reason} values:")
+        for value, count in top_unique_value_counts.items():
+            print(f"  {value}: {count}")
 
 # Return true if the column values are all numeric
 # with optional verbose output
 def verify_column_values_are_numeric(df, col, verbose=False):
-    non_numeric_values = find_non_numeric_values(df, col)
+    non_numeric_values = find_non_numeric_value_counts(df, col)
     num_non_numeric_values = len(non_numeric_values)
-    if num_non_numeric_values > 0 and not verbose:
+    if num_non_numeric_values > 0:
+        if verbose:
+            print_top_skipped_value_counts("", col, "non-numeric", non_numeric_values)
         return False
-    show_num_values = min(5, num_non_numeric_values)
-    top_unique_values = non_numeric_values.value_counts().head(show_num_values)
-    if verbose:
-        print(f"column {col}:")
-        print(f" num_non_numeric_values: {num_non_numeric_values}")
-        print(f" top {len(top_unique_values)} non_numeric_values:")
-        for value, count in top_unique_values.items():
-            print(f"  {value}: {count}")
-        if num_non_numeric_values > 0:
-            print(f"  skipping plot_column_distribution for column {col} because it has non-numeric values")
-    return num_non_numeric_values == 0
+    return True
 
 # Autoscale all numeric columns in a DataFrame
 # any non-numerical columns will be ignored
@@ -281,13 +305,13 @@ def autoscale_numeric_column(df, col, verbose=False):
     # includes option to show stats and distribution
     # before and after scaling. If the column is not numeric
     # the function will return the DataFrame as is
-    num_non_numeric_values = len(find_non_numeric_values(df, col, verbose=verbose))
+    num_non_numeric_values = len(find_non_numeric_value_counts(df, col, verbose=verbose))
     if num_non_numeric_values > 0:
         if verbose:
-            print(f"autoscale_numeric_column skipping column: {col} with {num_non_numeric_values} non-numeric values")   
+            print(f"autoscale_numeric_column skipping column: '{col}' with {num_non_numeric_values} non-numeric values")   
         return df
     
-    title = "Column:{col} stats and distribution"
+    title = "Column: '{col}' stats and distribution"
     if verbose:
         show_column_stats(df, col, title=title+" before scaling")
         
@@ -316,17 +340,15 @@ def autoscale_numeric_column(df, col, verbose=False):
 
     # return the DataFrame with the scaled column
     return df
-    
-
 
 def show_clean_column_stats(clean_df, col, title="", max_output_lines=10):
     if col not in clean_df.columns:
-        raise ValueError(f"Column: {col} not found in clean_df")
+        raise ValueError(f"column: '{col}' not found in clean_df")
         return
     clean_df_col = clean_df[col]
     nan_count = clean_df_col.isna().sum()
     if nan_count > 0:
-        ValueError(f"Column: {col} has nan_count: {nan_count} > 0")
+        ValueError(f"column: '{col}' has nan_count: {nan_count} > 0")
         return
     
     show_column_stats(clean_df, col, title="", max_output_lines=10)
@@ -373,7 +395,7 @@ def compare_numeric_scalers(cdf, column_pair,  threshold=3):
     for col in column_pair:
         clean_col_series = cdf[col]
         if clean_col_series.isna().sum() > 0:
-            ValueError(f"Column: {col} has nan_count > 0")
+            ValueError(f"column: '{col}' has nan_count > 0")
             return
 
     # Step 1: Apply StandardScaler

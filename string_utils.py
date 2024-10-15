@@ -64,7 +64,7 @@ def print_wrapped_list(title, indent=None,  wrap=5, list=[]):
         print(f"{indent}{list[i:j]}")
 
 def format_engineering_value(value):
-    # Format a numeric value in engineering notation
+    # Format a numeric value to a string in engineering notation
     if value is None or not isinstance(value, (int, float)):
         return ''
     if math.isnan(value):

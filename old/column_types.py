@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import textwrap
 from tee_utils import Tee
+from thread_utils import run_with_message
 
 column_errors: dict[str, list[str]] = {}
 
@@ -16,12 +17,12 @@ def show_all_column_stats(df):
         show_column_stats(df, col)
 
 def show_column_stats(df, col, title=""):
-    print(f"Column: {col} Stats: {title}")
+    print(f"column: '{col}' Stats: {title}")
     print(df[col].describe())
     print(f"Number of unique values: {df[col].notnull().nunique()}")
     errors = column_errors.get(col)
     num_errors = 0 if errors is None else len(errors)
-    print(f"Column: {col} has {num_errors} extraction errors")
+    print(f"column: '{col}' has {num_errors} extraction errors")
     if num_errors > 0:
         for error in errors:
             print(f"{col}: |{error}|")
@@ -235,7 +236,7 @@ def get_column_type_extractor(column_type):
 def change_column_dtype(df, col):
     target_dtype = target_dtypes.get(column_types.get(col))
     if target_dtype is None:
-        print(f"Column: {col} has no target_dtype")
+        print(f"column: '{col}' has no target_dtype")
         return df
     # Ensure all non-null values match the target data type
     if target_dtype == 'int':
@@ -249,7 +250,7 @@ def change_column_dtype(df, col):
     
     # Change the data type of the column
     df[col] = df[col].astype(target_dtype)
-    print(f"Changed data type of column: {col} to {target_dtype}")
+    print(f"Changed data type of column: '{col}' to {target_dtype}")
     return df
 
 def is_dtype_numeric(dtype):
@@ -262,6 +263,11 @@ def get_columns_with_numeric_dtypes(df):
             numeric_columns.append(col)
     return numeric_columns
 
+def get_all_column_values_match(df, col, column_type):
+    return df[col].dropna().apply(lambda x: column_type_extractors[column_type](x) is not None).all()
+
+def compute_all_column_values_match(df, col, column_type, message, interval_seconds):
+    
 # process the columns of the DataFrame
 # if fix is true, then replace invalid values with None
 # so they can be easily ignored in future processing
@@ -273,31 +279,32 @@ def process_columns(df, fix=False):
             pass
         column_type = column_types.get(col)
         if column_type is None:
-            print(f"Column: {col} has no column_type")
+            print(f"column: '{col}' has no column_type")
             continue
         column_type_extractor = column_type_extractors.get(column_type)
         if column_type_extractor is None:
-            print(f"Column: {col} has no column_type_extractor")
+            print(f"column: '{col}' has no column_type_extractor")
             continue
-        def column_type_matcher(x):
-            return column_type_extractor(x) is not None
-        all_values_match = df[col].dropna().apply(column_type_matcher).all()
+        
+        message = f"Checking all values of column: '{col}' for type {column_type}..."
+        interval_seconds=2
+        all_values_match = compute_all_column_values_match(df, col, column_type, message=message, interval_seconds=interval_seconds)
         if all_values_match:
             passing_columns.append(col)
-            print(f"All non-null values of column: {col} are of type {column_type}")
+            print(f"All non-null values of column: '{col}' are of type {column_type}")
         else:
             # find all unique non-null values that do not match the column type
             non_matching_mask = df[col].dropna().apply(lambda x: not column_type_matcher(x))
             non_matching_unique_values = df[col].dropna()[non_matching_mask].unique()
             n = len(non_matching_unique_values)
             if n > 0:
-                print(f"Column: {col} has {n} non-null values that do not match {column_type}")
+                print(f"column: '{col}' has {n} non-null values that do not match {column_type}")
                 for v in non_matching_unique_values:
-                    error = f"|{v}| does not match {column_type} for column: {col}"
+                    error = f"|{v}| does not match {column_type} for column: '{col}'"
                     print(error)
                     save_column_error(col, error)
                 if fix:
-                    print(f"Fixing {n} values for column: {col}")
+                    print(f"Fixing {n} values for column: '{col}'")
                     df.loc[non_matching_mask, col] = None
             if fix:
                 change_column_dtype(df, col)
@@ -319,7 +326,7 @@ def process_columns(df, fix=False):
             errors = column_errors[col]
             print(f"Column: [{col}] [{coltype}/{dtype}] has {len(errors)} errors", file=tee)
             for index, error in enumerate(errors):
-                wrapped_error = textwrap.fill(f"{col}: error: {index} >|{error}|<", width=80)
+                wrapped_error = textwrap.fill(f"Column: '{col}': error: {index} >|{error}|<", width=80)
                 print(wrapped_error, file=tee)
                 tee.flush()
     
