@@ -9,8 +9,8 @@ class TestColumnTypes(TestCase):
         x = extract_string(s)
         self.assertEqual(x, s, "Error should be equal")
         
-        s = "  [{'id': 16, 'name': 'le'Animation3'}]  "
-        expected = "[{'id': 16, 'name': 'le'Animation3'}]"
+        s =        "  [{'id': 16, 'name': 'le\\'Animation3'}]  "
+        expected = "[{'id': 16, 'name': 'le\\'Animation3'}]"
         x = extract_string(s)
         self.assertEqual(x, expected, f"Error should match expected stripped version of s {expected}")
 
@@ -20,7 +20,7 @@ class TestColumnTypes(TestCase):
         self.assertIsNotNone(x, "Error should not have returned None")
         self.assertIsInstance(x, dict, "Error should have returned a dict")
 
-        s = "{'id': 16, 'name': 'le\\'Animation6'}"
+        s = "{'id': 16, 'name': 'le\\\'Animation6'}"
         x = extract_dict(s)
         self.assertIsNotNone(x, "Error should not have returned None")
         self.assertIsInstance(x, dict, "Error should have returned a dict")
@@ -98,7 +98,7 @@ class TestColumnTypes(TestCase):
         self.assertIsNone(y, "Error should have returned None")
     
     def test_extract_object(self):
-        case_a = "[{'id': 16, 'name': 'le'Animation1'}, {'id': 17, 'name': 'Action'}]"
+        case_a = "[{'id': 16, 'name': 'le\\'Animation1'}, {'id': 17, 'name': 'Action'}]"
         result_a = extract_object(case_a)
         self.assertIsNotNone(result_a, "Error result should not be None")
         self.assertIsInstance(result_a, list)
@@ -177,7 +177,7 @@ class TestColumnTypes(TestCase):
             'B': [4.5, None, None],
             'C': [7.0, None, None]
         }
-        error_message = self.print_and_compare("make all values float", input_data, expected_data, cast_to_float)
+        error_message = self.print_and_compare("cast all values to float", input_data, expected_data, cast_to_float)
         if error_message:
             self.fail(error_message)
     
@@ -197,49 +197,123 @@ class TestColumnTypes(TestCase):
             self.fail(error_message)
 
     def test_cast_all_values_to_integer(self):
+        # if integer columns dtypes are not specified, then 
+        # because any column with both None (or Nan) and 
+        # numeric values is considered mixed. and mixed 
+        # columns are cast to float because NaN is a 
+        # floating-point representation
+        # of missing data
         input_data = {
-            'A': ['1', '2', 'a'],
-            'B': ['4.5', True, 'b'],
-            'C': ['7', '8', 'c']
+            'A': [1, 2, 'a'],
+            'B': [5.5, False, None],
+            'C': [7, -8.5, 'B']
         }
+        
         expected_data = {
             'A': [1, 2, None],
-            'B': [5, None, None],
-            'C': [7, 8, None]
+            'B': [6, None, None],
+            'C': [7, -9, None]
         }
-        error_message = self.print_and_compare("test_cast_all_values_to_integers", input_data, expected_data, cast_to_integer)
+        error_message = self.print_and_compare("test_cast_all_values_to_integer", input_data, expected_data, cast_to_integer)
         if error_message:
             self.fail(error_message)
             
     def test_cast_all_values_to_string(self):
         input_data = {
             'A': [1, '2', '{"a": 7}' ],
-            'B': ['happy', 'day\s', '[{"b": 8},{"c": 9}]' ],
+            'B': ['happy', 'day\\\'s', '[{"b": 8},{"c": 9}]' ],
             'C': [7, True, '(1,2,3)']
         }
         expected_data = {
             'A': ['1', '2', '{"a": 7}' ],
-            'B': ['happy', 'day\s', '[{"b": 8},{"c": 9}]' ],
+            'B': ['happy', 'day\\\'s', '[{"b": 8},{"c": 9}]' ],
             'C': ['7', 'True', '(1,2,3)']
         }
         error_message = self.print_and_compare("test_cast_all_values_to_strings", input_data, expected_data, cast_to_string)
         if error_message:
             self.fail(error_message)
+        print()
 
-    def print_and_compare(self, test_name, input_data, expected_data, converter):
-        print('-' * 80)
+    # return an error_message if any of the result values
+    # don't match the expected values.
+    # otherwise, return None if there are no errors
+    def print_and_compare(self, test_name, data_input, data_expected, value_converter):
+        print('=' * 80)
         print(test_name)
-        df_input = pd.DataFrame(input_data)
-        print("df_input:")
+        
+        print("df_input:------------------------------------")
+        df_input = pd.DataFrame(data_input)
         print(df_input)
-        df_result = df_input.map(converter)
-        print("df_result:")
-        print(df_result)
-        df_expected = pd.DataFrame(expected_data)
-        print("df_expected:")
+        
+        print("df_expected:---------------------------------")
+        df_expected = pd.DataFrame(data_expected)
         print(df_expected)
-        result = df_result.equals(df_expected)
-        if result is False:
-            return(f"Error: {test_name} failed")
+        
+        print("df_result:-----------------------------------")
+        df_result = self.map_all_columns(df_input, value_converter)
+        print(df_result)
+        
+        error_message = self.df_compare(test_name, df_expected, df_result)
+        if error_message:
+            self.fail(error_message)
+
+    def map_all_columns(self, df, value_converter):
+       return df.apply(lambda col: col.map(value_converter))
+   
+    def df_compare(self, test_name, df_exp, df_rst):
+        str_exp = df_exp.to_string().replace('\n', '')
+        str_rst = df_rst.to_string().replace('\n', '')
+        mismatch_index = self.first_mismatch_index(str_exp, str_rst)
+        if mismatch_index != -1:
+            error_lines = []
+            error_lines.append(f"df_exp: {str_exp}")
+            error_lines.append(f"df_rst: {str_rst}")
+            line1 = " " * 8
+            line2 = " " * 8
+            for i in range(len(df_exp.to_string().replace('\n',''))):
+                line1 += str(i % 10)
+                line2 += str((i // 10) % 10)
+            error_lines.append(line1)
+            error_lines.append(line2)
+            error_lines.append("       |"+('-' * mismatch_index) + '^')
+            return f"{test_name} Failed at mismatch index: {mismatch_index}\n"  + '\n'.join(error_lines)
         else:
             return None
+        
+
+    def first_mismatch_index(self, str1, str2):
+        min_length = min(len(str1), len(str2))
+        for i in range(min_length):
+            if str1[i] != str2[i]:
+                return i
+        if len(str1) != len(str2):
+            return min_length
+        return -1  # Return -1 if the strings are identical
+
+    
+    def test_type_casters(self):
+        
+        def p_typed_value(x):
+            type_str = type(x).__name__
+            if type_str == 'str':
+                return f's:{x}'
+            if type_str == 'NoneType':
+                return 'n:None'
+            if type_str == 'bool':
+                return f'b:{x}'
+            if type_str == 'int':
+                return f'd:{x}'
+            if type_str == 'float':
+                return f'f:{x}'
+            raise ValueError(f"Unknown type {type_str}")
+
+        values = [True, False, 'True', 'False', 'true', 'false', 1, '1', 1.0, '1.0', None, 'None', "hot's", 'hot\\\'s']
+        type_casters  = [cast_to_boolean, cast_to_integer, cast_to_float, cast_to_string]
+        for value in values:
+            for type_caster in type_casters:
+                result = type_caster(value)
+                print(f"{type_caster.__name__}({p_typed_value(value)}) -> {p_typed_value(result)}")
+  
+        
+        
+        

@@ -5,6 +5,7 @@ import textwrap
 from tee_utils import Tee
 import ast
 from thread_utils import run_with_message
+import math
 
 column_errors: dict[str, list[str]] = {}
 
@@ -40,20 +41,30 @@ def cast_to_boolean(x):
                 return False    
     return None
 
+def round_float_to_integer(x):
+    if x < 0.0:
+        return -math.floor(0.5-x)
+    elif x > 0.0:
+        return math.floor(x+0.5)
+    else:
+        return 0
+
 def cast_to_integer(x):
     if x is None:
         return None
+    if isinstance(x, bool): # must precede int check because bool is a subclass of int
+        return None  
     if isinstance(x, int):
         return x
     if isinstance(x, float):
-        return round(x)
+        return round_float_to_integer(x)
     if isinstance(x, str):
         x = x.strip()
         if len(x) > 0:
             if x.isdigit():
                 return int(x)
             if has_float_pattern(x):
-                return round(float(x))
+                return round_float_to_integer(float(x))
     return None
 
 def cast_to_float(x):
@@ -61,6 +72,8 @@ def cast_to_float(x):
         return None
     if isinstance(x, float):
         return x
+    if isinstance(x, bool): # must precede int check because bool is a subclass of int
+        return None
     if isinstance(x, int):
         return float(x)
     if isinstance(x, str):
@@ -103,10 +116,12 @@ def extract_integer(x):
         return None
     if isinstance(x, str) and len(x.strip()) > 0 and x.strip() == 'NaN':
         return None
+    if isinstance(x, bool): # must precede int check because bool is a subclass of int
+        return None
     if isinstance(x, int):
         return x
     if isinstance(x, float):
-        x = str(x)
+        return round_float_to_integer(x)
     s = extract_string(x)
     if s is not None:
         if s.lower() == 'nan':
@@ -131,6 +146,8 @@ def is_integer(s):
 # extract a float from a float, int or string
 def extract_float(x):
     if x is None:
+        return None
+    if isinstance(x, bool): # must precede int check because bool is a subclass of int
         return None
     if isinstance(x, int):
         return float(x)
