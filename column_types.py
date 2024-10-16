@@ -20,90 +20,112 @@ def save_column_error(column, error):
     if column not in column_errors or not isinstance(column_errors[column], list):
         column_errors[column] = []
     column_errors[column].append(error)
+
+fNaN = float('NaN')
+
+# return a string representation of the 
+# type of the given value
+def p_typed_value(x):
+    if pd.isna(x):
+        return 'f:NaN'          # NaN is a float
+    type_str = type(x).__name__
+    if type_str == 'NoneType':
+        return 'f:None'        # none is a float
+    if type_str == 'bool':
+        return f'b:{x}'
+    if type_str == 'int':
+        return f'd:{x}'
+    if type_str == 'float':
+        return f'f:{x}'
+    if type_str == 'str':
+        return f's:{x}'
+    raise ValueError(f"Unknown type {type_str}")
+
     
 def cast_to_string(x):
-    if x is None:
+    if (x is None):
+        return 'None'
+    if pd.isna(x):
+        return 'nan'
+    try:
+        v = str(x)
+        return v
+    except ValueError:
         return None
-    return str(x)
 
 def cast_to_boolean(x):
-    if x is None:
+    if (x is None) or pd.isna(x):
         return None
     if isinstance(x, bool):
         return x
     if isinstance(x, str):
-        x = x.strip()
-        if len(x) > 0:
-            x = x.lower()
-            if x == "true":
-                return True
-            if x == "false":
-                return False    
+        x = x.strip().lower()
+        if x == "true":
+            return True
+        if x == "false":
+            return False    
     return None
 
 def round_float_to_integer(x):
+    if type(x) is not float:
+        raise ValueError(f"input must be a float, not ${x.__class__.__name__}")
     if x < 0.0:
-        return -math.floor(0.5-x)
+        v = -math.floor(0.5-x)
     elif x > 0.0:
-        return math.floor(x+0.5)
+        v = math.floor(x+0.5)
     else:
+        return 0
+    try:
+        s = str(v)
+        if s.endswith('.0'):
+            v = int(s[:-2])
+        return v
+    except ValueError:
         return 0
 
 def cast_to_integer(x):
-    if x is None:
+    if pd.isna(x) or (x is None) or isinstance(x, bool):
         return None
-    if isinstance(x, bool): # must precede int check because bool is a subclass of int
-        return None  
     if isinstance(x, int):
         return x
     if isinstance(x, float):
-        return round_float_to_integer(x)
+        v = round_float_to_integer(x)
+        return v
     if isinstance(x, str):
-        x = x.strip()
-        if len(x) > 0:
-            if x.isdigit():
-                return int(x)
-            if has_float_pattern(x):
-                return round_float_to_integer(float(x))
+        s = x.strip()
+        if s.isdigit():
+            return int(s)
+        v = float_from_string(s)
+        if v is not None:
+            return round_float_to_integer(v)
     return None
 
 def cast_to_float(x):
-    if x is None:
+    if pd.isna(x) or (x is None) or isinstance(x, bool):
         return None
     if isinstance(x, float):
         return x
-    if isinstance(x, bool): # must precede int check because bool is a subclass of int
-        return None
     if isinstance(x, int):
-        return float(x)
+        v = float(x)
+        return v
     if isinstance(x, str):
-        x = x.strip()
-        if len(x) > 0:
-            if x.isdigit():
-                return float(int(x))
-            if has_float_pattern(x):
-                return float(x)
+        s = x.strip()
+        if s.isdigit():
+            return float(int(s))
+        v = float_from_string(x)
+        if v is not None:
+            return v
     return None
-
-def has_float_pattern(x):
-    if x is None:
-        return False
-    if isinstance(x, str):
-        x = x.strip()
-        if len(x) > 0:
-            return re.match(r"[-+]?\d*\.\d+", x) is not None
-    return False
 
 # process a string, returning None if the string is empty or 'nan
 def extract_string(x):
-    if x is None:
+    if pd.isna(x) or (x is None) or isinstance(x, bool):
         return None
     if isinstance(x, str):
         x = x.strip()
-        if len(x) > 0:
-            if x.lower() == 'nan':
-                return None
-            return x
+        if x.lower() == 'nan':
+            return None
+        return x
     return None
 
 def is_string(s):
@@ -112,42 +134,47 @@ def is_string(s):
 # attempt to extract an integer from a an integer, float or string
 # return None if the string is empty or cannot be converted to an integer
 def extract_integer(x):
-    if x is None:
-        return None
-    if isinstance(x, str) and len(x.strip()) > 0 and x.strip() == 'NaN':
-        return None
-    if isinstance(x, bool): # must precede int check because bool is a subclass of int
+    if pd.isna(x) or (x is None) or isinstance(x, bool):
         return None
     if isinstance(x, int):
         return x
     if isinstance(x, float):
         return round_float_to_integer(x)
-    s = extract_string(x)
-    if s is not None:
-        if s.lower() == 'nan':
-            return None
-
-        # if s has a decimal point followed by 1 or more zeros, 
-        # remove the decimal point and zeros
-        match = re.match(r"(\d+)\.0+", s)
-        if match:
-            x = match.group(1)
-        if x.isdigit():
-            try:
-                return int(x)
-            except ValueError:
-                return None
-        return None
+    if isinstance(x, str):
+        s = x.strip()
+        if s.isdigit():
+            return int(s)
+        v = float_from_string(s)
+        if v is not None:
+            return round_float_to_integer(v)
     return None
+
+# return a float from a string or None if the string 
+# is empty or does not have a float pattern
+def float_from_string(s):
+    if not isinstance(s, str):
+        raise ValueError("input must be a string")
+    try:
+        if s.isdigit():
+            return float(int(s))
+        if has_float_pattern(s):
+            return float(s) 
+    except ValueError:
+        return None
+    
+def has_float_pattern(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 def is_integer(s):
     return extract_integer(s) is not None
 
 # extract a float from a float, int or string
 def extract_float(x):
-    if x is None:
-        return None
-    if isinstance(x, bool): # must precede int check because bool is a subclass of int
+    if pd.isna(x) or (x is None)  or isinstance(x, bool):
         return None
     if isinstance(x, int):
         return float(x)
@@ -155,8 +182,6 @@ def extract_float(x):
         return x
     s = extract_string(x)
     if s is not None:
-        if s.lower() == 'nan':
-            return None
         try:
             return float(s)
         except ValueError:
@@ -171,7 +196,7 @@ def is_numeric(s):
 
 # extract a boolean from a boolean or a string
 def extract_boolean(x):
-    if x is None:
+    if (x is None):
         return None
     if isinstance(x, bool):
         return x

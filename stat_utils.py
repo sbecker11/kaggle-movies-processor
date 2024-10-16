@@ -3,7 +3,7 @@ import numpy as np
 import re
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from column_types import get_column_type, is_numeric_column_type, is_float_column_type, get_column_type_extractor, is_numeric, is_integer, is_float, get_cplumn_errors, save_column_errors
+from column_types import get_column_type, is_numeric_column_type, is_float_column_type, get_column_type_extractor, is_numeric, is_integer, is_float
 from tabulate import tabulate
 from decorators import char_decoder
 from string_utils import format_value, Justify
@@ -174,18 +174,32 @@ def show_column_value_counts(df, col, max_output_lines, not_null=True):
     except KeyError as ke:
         print(f"KeyError: {ke}")
 
+def verbose_drop_duplicates(df, verbose=False):
+    num_duplicates = df.duplicated().sum()
+    if num_duplicates > 0:
+        if verbose:
+            indexes_of_duplicate_rows = df[df.duplicated()].index.tolist()
+            ids_of_duplicate_rows = df.loc[indexes_of_duplicate_rows, 'id'].tolist()
+            print(f"Dropping {num_duplicates} row ids: {ids_of_duplicate_rows}")
+        df = df.drop_duplicates()
+        if verbose:
+            print(f"Keeping the first instance of duplicate rows with ids :\n{ids_of_duplicate_rows}")   
+            print(f"shape after dropping {num_duplicates} duplicate rows - shape: {df.shape()}")
+    return df
+    
 def get_prefiltered_df(df):
     # returns a dataframe with duplicate rows removed
     # and columns with more than 75% NaN values removed
     
-    percent_threshold = 75
-    nan_threshold = percent_threshold * len(df) / 100
-    
     # drop duplicate rows
-    prefiltered_df = df.drop_duplicates()
+    prefiltered_df = verbose_drop_duplicates(df)
+    
+    # drop columns with more than 75% NaN values
+    nan_threshold_percent = 75
+    nan_threshold_sum = nan_threshold_percent * len(df) / 100
     for col in prefiltered_df.columns:
         # drop column if it contains more than 75% NaN values
-        if prefiltered_df[col].isna().sum() >= nan_threshold:
+        if prefiltered_df[col].isna().sum() >= nan_threshold_sum:
             prefiltered_df = prefiltered_df.drop(columns=[col]) 
     return prefiltered_df
 
@@ -257,8 +271,7 @@ def find_float_values(df, col):
     float_values = df[col][df[col].apply(is_float)]
     return float_values
 
-# Return a possibly empty list of non-numeric values 
-# of type 'object' from the DataFrame
+# Return's the list of all non-numeric values 
 def find_non_numeric_value_counts(df, col):
     non_numeric_value_counts = df[col][~df[col].apply(is_numeric)].value_counts()
     return non_numeric_value_counts
@@ -278,23 +291,19 @@ def print_top_skipped_value_counts( funcName, col, skipped_reason, skipped_value
         for value, count in top_unique_value_counts.items():
             print(f"  {value}: {count}")
 
-# Return true if the column values are all numeric
-# with optional verbose output
-def verify_column_values_are_numeric(df, col, verbose=False):
-    non_numeric_values = find_non_numeric_value_counts(df, col)
-    num_non_numeric_values = len(non_numeric_values)
-    if num_non_numeric_values > 0:
-        if verbose:
-            print_top_skipped_value_counts("", col, "non-numeric", non_numeric_values)
-        return False
-    return True
-
 # Autoscale all numeric columns in a DataFrame
 # any non-numerical columns will be ignored
+# even columns with numeric column_types will
+# be ignored if they contain non-numeric values
 def autoscale_numeric_columns(df, verbose=False):
     for col in df.columns:
         if is_numeric_column_type(col):
-            df = autoscale_numeric_column(df, col, verbose=verbose)
+            non_numerics = find_non_numeric_value_counts(df, col)
+            num_non_numerics = len(non_numerics)
+            if num_non_numerics > 0:
+                print(f"ERROR: skipping numeric_column: '{col}' which has {num_non_numerics} non-numeric values")
+            else:
+                df = autoscale_numeric_column(df, col, verbose=verbose)
     return df         
 
 def autoscale_numeric_column(df, col, verbose=False):

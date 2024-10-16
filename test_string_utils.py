@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from string_utils import format_value, Justify, SpecialChars
+from string_utils import format_value, Justify, SpecialChars, format_engineering_value, parse_engineering_value
 
 class TestStringUtils(TestCase):
   
@@ -34,7 +34,7 @@ class TestStringUtils(TestCase):
         val_size = 10
         fill_width = 12
         result = format_value(value, val_size, fill_width).replace(' ', '_')
-        expected = '_____1.235e9'
+        expected = '___1.235e+09'
         self.assertEqual(expected, result, "Expected: {expected}, Got: {result}")
         
         # Negative Big integer test
@@ -42,7 +42,7 @@ class TestStringUtils(TestCase):
         val_size = 10
         fill_width = 12
         result = format_value(value, val_size, fill_width).replace(' ', '_')
-        expected = '____-1.235e9'
+        expected = '__-1.235e+09'
         self.assertEqual(expected, result, "Expected: {expected}, Got: {result}")
         
         # Negative Big integer test, center justified
@@ -50,7 +50,7 @@ class TestStringUtils(TestCase):
         val_size = 10
         fill_width = 12
         result = format_value(value, val_size, fill_width, justify=Justify.CENTER).replace(' ', '_')
-        expected = '__-1.235e9__'
+        expected = '_-1.235e+09_'
         self.assertEqual(expected, result, "Expected: {expected}, Got: {result}")
 
         # Big engineering notation test
@@ -101,3 +101,37 @@ class TestStringUtils(TestCase):
         expected = '_{"a"' + SpecialChars.ELIPSIS_CHAR.value + '_'
         self.assertEqual(expected, result, "Expected: {expected}, Got: {result}")
 
+    def test_engineering_format(self):
+        test_strings = ['1.230e+03', '1.230e-03', '-1.230e+03', '0.000e+00', 'NaN', 'invalid']
+        test_values =    [1230.0, 0.00123, -1230.0, 0.0, None, None]
+        if len(test_strings) != len(test_values):
+            raise ValueError("test_strings and test_values must have the same length")
+        
+        for i in range(len(test_strings)):
+            formatted_result = format_engineering_value(test_values[i])
+            expected_result = '' if test_values[i] is None else test_strings[i] 
+            if formatted_result != expected_result:
+                self.fail(f"format_engineering_value('{test_values[i]}') -> {formatted_result} != {expected_result}")
+            else:
+                self.assertEqual(formatted_result, expected_result, f"format_engineering_value('{test_values[i]}') -> {expected_result}")
+
+    def test_engineering_parse(self):
+        test_strings = ['1.230e+03', '1.230e-03', '-1.230e+03', '0.000e+00', 'NaN', 'invalid']
+        test_values =    [1230.0, 0.00123, -1230.0, 0.0, None, None]
+        if len(test_strings) != len(test_values):
+            raise ValueError("test_strings and test_values must have the same length")
+        
+        for i in range(len(test_strings)):
+            parsed_result = parse_engineering_value(test_strings[i])
+            if parsed_result != test_values[i]:
+                self.fail(f"parse_engineering_value('{test_strings[i]}') -> {parsed_result} != {test_values[i]}")
+            else:
+                self.assertEqual(parsed_result, test_values[i], f"parse_engineering_value('{test_strings[i]}') -> {parsed_result}")
+
+    def test_engineering_format_jnversion(self):
+        # test f'(f(x)) = x  for several test_values of x
+        test_values = [1.23e+03, 123.4, 0.00123, -1230.0, 0.0, None]    
+        for test_value in test_values:
+            formatted_result = format_engineering_value(test_value)
+            parsed_result = parse_engineering_value(formatted_result)
+            self.assertEqual(test_value, parsed_result, f"format_engineering_value('{test_value}') -> '{formatted_result}' -> {parsed_result}")

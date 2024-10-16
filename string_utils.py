@@ -1,9 +1,7 @@
 import json
-from decimal import Decimal
 import pandas as pd
-import math
 from enum import Enum
-
+import re
 
 # use SpecialChars.ELIPSIS_CHAR.value to get the actual character
 class SpecialChars(Enum):
@@ -65,32 +63,21 @@ def print_wrapped_list(title, indent=None,  wrap=5, list=[]):
 
 def format_engineering_value(value):
     # Format a numeric value to a string in engineering notation
-    if value is None or not isinstance(value, (int, float)):
+    if value is None or not isinstance(value, (int, float)) or pd.isna(value):
         return ''
-    if math.isnan(value):
-        return 'NaN'
-    # Format a numeric value in engineering notation
-    decimal_value = Decimal(value)
-    engineering_format = '{:e}'.format(decimal_value)
+    return '{:.3e}'.format(value)
     
-    # Split the engineering notation into mantissa and exponent
-    mantissa, exponent = engineering_format.split('e')
-    exponent = int(exponent)
-    if exponent == 0:
-        return mantissa
+def parse_engineering_value(s):
+    if s is None or not isinstance(s, str) or pd.isna(s):
+        return None
     
-    # Adjust the exponent to be a multiple of 3
-    exponent_adjusted = exponent - (exponent % 3)
-    
-    # Adjust the mantissa accordingly
-    mantissa_adjusted = Decimal(mantissa) * (10 ** (exponent % 3))
-
-    # Combine the adjusted mantissa and exponent
-    engineering_notation_value = '{:.3f}e{}'.format(mantissa_adjusted, exponent_adjusted)
-
-    # Return the string cast-ed value. use format_string to format the string
-    return str(engineering_notation_value)
-    
+    # Regular expression to match engineering notation
+    match = re.match(r'([-+]?\d*\.?\d+)[eE]([-+]?\d+)', s)
+    if match:
+        mantissa = float(match.group(1))
+        exponent = int(match.group(2))
+        return mantissa * (10 ** exponent)
+    return None
     
 def format_string(value, val_size, fill_width, justify):
     # cast value to string if needed, defaulting to a single space

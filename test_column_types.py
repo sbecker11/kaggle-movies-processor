@@ -1,4 +1,4 @@
-from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime, cast_to_string, cast_to_boolean, cast_to_float, cast_to_integer, process_columns, verify_all_columns_have_extractors
+from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime, cast_to_string, cast_to_boolean, cast_to_float, cast_to_integer, p_typed_value, fNaN
 from unittest import TestCase
 import pandas as pd
 
@@ -30,15 +30,15 @@ class TestColumnTypes(TestCase):
         y = extract_integer(x)
         self.assertIsNotNone(y, "Error should not have returned None")
         self.assertIsInstance(y, int, "Error should have returned an integer")
-        self.assertEqual(y, 123, "Error should have returned 123")
+        self.assertEqual(123, y, "Error should have returned 123")
         
         x = "123.14"
         y = extract_integer(x)
-        self.assertIsNone(y, "Error should have returned None")
+        self.assertEqual(123,y, "Error should have returned 123")
         
         x = "123E-10"
         y = extract_integer(x)
-        self.assertIsNone(y, "Error should have returned None")
+        self.assertEqual(0, y, "Error should have returned 0")
         
         x = "  "
         y = extract_integer(x)
@@ -48,14 +48,14 @@ class TestColumnTypes(TestCase):
         y = extract_integer(x)
         self.assertIsNotNone(y, "Error should not have returned None")
         self.assertIsInstance(y, int, "Error should have returned an integer")
-        self.assertEqual(y, 123, "Error should have returned 123")
+        self.assertEqual(123, y, "Error should have returned 123")
 
     def test_extract_float(self):
         x = "3.14"
         y = extract_float(x)
         self.assertIsNotNone(y, "Error should not have returned None")
         self.assertIsInstance(y, float, "Error should have returned a float")
-        self.assertEqual(y, 3.14, "Error should have returned 3.14")
+        self.assertEqual(3.14, y, "Error should have returned 3.14")
 
         x = "3.14.14"
         y = extract_float(x)
@@ -70,20 +70,20 @@ class TestColumnTypes(TestCase):
         y = extract_float(x)
         self.assertIsNotNone(y, "Error should not have returned None")
         self.assertIsInstance(y, float, "Error should have returned a float")
-        self.assertEqual(y, x, f"Error should have returned {x}")
+        self.assertEqual(x, y, f"Error should have returned {x}")
 
     def test_extract_boolean(self):
         x = "True"
         y = extract_boolean(x)
         self.assertIsNotNone(y, "Error should not have returned None")
         self.assertIsInstance(y, bool, "Error should have returned a boolean")
-        self.assertEqual(y, True, "Error should have returned True") 
+        self.assertEqual(True, y, "Error should have returned True") 
 
         x = "False"
         y = extract_boolean(x)
         self.assertIsNotNone(y, "Error should not have returned None")
         self.assertIsInstance(y, bool, "Error should have returned a boolean")
-        self.assertEqual(y, False, "Error should have returned False") 
+        self.assertEqual(False, y, "Error should have returned False") 
 
         x = "Falsee"
         y = extract_boolean(x)
@@ -253,6 +253,8 @@ class TestColumnTypes(TestCase):
         df_result = self.map_all_columns(df_input, value_converter)
         print(df_result)
         
+        print(f"{cast_to_integer(6.0)}")
+        
         error_message = self.df_compare(test_name, df_expected, df_result)
         if error_message:
             self.fail(error_message)
@@ -289,25 +291,38 @@ class TestColumnTypes(TestCase):
         if len(str1) != len(str2):
             return min_length
         return -1  # Return -1 if the strings are identical
-
     
     def test_type_casters(self):
+        self.assertTrue(cast_to_integer(fNaN) is None, "Error should have returned None")
+        self.assertTrue(cast_to_integer(None) is None, "Error should have returned None")
+        self.assertTrue(cast_to_integer(True) is None, "Error should have returned None")
+        self.assertTrue(cast_to_integer(False) is None, "Error should have returned None")
+        self.assertTrue(cast_to_integer("hot's") is None, "Error should have returned None")
+        self.assertTrue(cast_to_integer("") is None, "Error should have returned None")
         
-        def p_typed_value(x):
-            type_str = type(x).__name__
-            if type_str == 'str':
-                return f's:{x}'
-            if type_str == 'NoneType':
-                return 'n:None'
-            if type_str == 'bool':
-                return f'b:{x}'
-            if type_str == 'int':
-                return f'd:{x}'
-            if type_str == 'float':
-                return f'f:{x}'
-            raise ValueError(f"Unknown type {type_str}")
+        self.assertTrue(cast_to_float(fNaN) is None, "Error should have returned None")
+        self.assertTrue(cast_to_float(None) is None, "Error should have returned None")
+        self.assertTrue(cast_to_float(True) is None, "Error should have returned None")
+        self.assertTrue(cast_to_float(False) is None, "Error should have returned None")
+        self.assertTrue(cast_to_float(False) is None, "Error should have returned None")
+        self.assertTrue(cast_to_float("hot's") is None, "Error should have returned None")
+        self.assertTrue(cast_to_float("") is None, "Error should have returned None")
 
-        values = [True, False, 'True', 'False', 'true', 'false', 1, '1', 1.0, '1.0', None, 'None', "hot's", 'hot\\\'s']
+        self.assertTrue(cast_to_boolean(fNaN) is None, "Error should have returned None")
+        self.assertTrue(cast_to_boolean(None) is None, "Error should have returned None")
+        self.assertTrue(cast_to_boolean(True) is True, "Error should have returned True")
+        self.assertTrue(cast_to_boolean(False) is False, "Error should have returned False")
+        self.assertTrue(cast_to_boolean("hot's") is None, "Error should have returned None")
+        self.assertTrue(cast_to_boolean("") is None, "Error should have returned None")
+
+        self.assertTrue(cast_to_string(fNaN) == 'nan', "Error should have returned 'nan'")
+        self.assertTrue(cast_to_string(None) == 'None', "Error should have returned 'None'")
+        self.assertTrue(cast_to_string(True) == 'True', "Error should have returned 'True'")
+        self.assertTrue(cast_to_string(False) == 'False', "Error should have returned 'False'")
+        self.assertTrue(cast_to_string("hot's") == "hot's", "Error should have returned hot's")
+        self.assertTrue(cast_to_string("") == "", "Error should have returned ''")
+
+        values = [fNaN, True, False, 'True', 'False', 'true', 'false', 1, '1', 1.0, '1.0', None, 'None', "hot's", 'hot\\\'s']
         type_casters  = [cast_to_boolean, cast_to_integer, cast_to_float, cast_to_string]
         for value in values:
             for type_caster in type_casters:
