@@ -1,4 +1,4 @@
-from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime, cast_to_string, cast_to_boolean, cast_to_float, cast_to_integer, p_typed_value, fNaN
+from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime, cast_to_string, cast_to_boolean, cast_to_float, cast_to_integer, p_typed_value, fNaN, fnan, fInf, finf
 from unittest import TestCase
 import pandas as pd
 
@@ -294,6 +294,8 @@ class TestColumnTypes(TestCase):
     
     def test_type_casters(self):
         self.assertTrue(cast_to_integer(fNaN) is None, "Error should have returned None")
+        self.assertTrue(cast_to_integer(fInf) is None, "Error should have returned None")
+        self.assertTrue(cast_to_integer(-fInf) is None, "Error should have returned None")
         self.assertTrue(cast_to_integer(None) is None, "Error should have returned None")
         self.assertTrue(cast_to_integer(True) is None, "Error should have returned None")
         self.assertTrue(cast_to_integer(False) is None, "Error should have returned None")
@@ -301,6 +303,8 @@ class TestColumnTypes(TestCase):
         self.assertTrue(cast_to_integer("") is None, "Error should have returned None")
         
         self.assertTrue(cast_to_float(fNaN) is None, "Error should have returned None")
+        self.assertTrue(cast_to_float(fInf) is None, "Error should have returned None")
+        self.assertTrue(cast_to_float(-fInf) is None, "Error should have returned None")
         self.assertTrue(cast_to_float(None) is None, "Error should have returned None")
         self.assertTrue(cast_to_float(True) is None, "Error should have returned None")
         self.assertTrue(cast_to_float(False) is None, "Error should have returned None")
@@ -309,6 +313,8 @@ class TestColumnTypes(TestCase):
         self.assertTrue(cast_to_float("") is None, "Error should have returned None")
 
         self.assertTrue(cast_to_boolean(fNaN) is None, "Error should have returned None")
+        self.assertTrue(cast_to_boolean(fInf) is None, "Error should have returned None")
+        self.assertTrue(cast_to_boolean(-fInf) is None, "Error should have returned None")
         self.assertTrue(cast_to_boolean(None) is None, "Error should have returned None")
         self.assertTrue(cast_to_boolean(True) is True, "Error should have returned True")
         self.assertTrue(cast_to_boolean(False) is False, "Error should have returned False")
@@ -316,6 +322,8 @@ class TestColumnTypes(TestCase):
         self.assertTrue(cast_to_boolean("") is None, "Error should have returned None")
 
         self.assertTrue(cast_to_string(fNaN) == 'nan', "Error should have returned 'nan'")
+        self.assertTrue(cast_to_string(fInf) == 'finf', "Error should have returned 'finf'")
+        self.assertTrue(cast_to_string(-fInf) == '-finf', "Error should have returned '-finf'")
         self.assertTrue(cast_to_string(None) == 'None', "Error should have returned 'None'")
         self.assertTrue(cast_to_string(True) == 'True', "Error should have returned 'True'")
         self.assertTrue(cast_to_string(False) == 'False', "Error should have returned 'False'")

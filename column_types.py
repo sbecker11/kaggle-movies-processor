@@ -1,33 +1,28 @@
-import json
-import pandas as pd
-import re
-import textwrap
-from tee_utils import Tee
 import ast
-from thread_utils import run_with_message
+import json
 import math
+import re
 
-column_errors: dict[str, list[str]] = {}
+import numpy as np
+import pandas as pd
 
-def get_column_errors(col):
-    return column_errors.get(col)
+from thread_utils import run_with_message
 
-def clear_column_errors(col):
-    column_errors[col] = []
+from column_errors_logger import logger as process_columns_logger
+import textwrap
 
-def save_column_error(column, error):
-    # create a new column_errors entry with an empty array
-    if column not in column_errors or not isinstance(column_errors[column], list):
-        column_errors[column] = []
-    column_errors[column].append(error)
-
-fNaN = float('NaN')
+fnan = fNaN = np.nan
+finf = fInf = np.inf
 
 # return a string representation of the 
 # type of the given value
 def p_typed_value(x):
-    if pd.isna(x):
+    if np.isna(x):
         return 'f:NaN'          # NaN is a float
+    if np.isinf(x):
+        return 'f:Inf'          # NaN is a float
+    if np.isneginf(x):
+        return '-f:Inf'          # NaN is a float
     type_str = type(x).__name__
     if type_str == 'NoneType':
         return 'f:None'        # none is a float
@@ -41,34 +36,133 @@ def p_typed_value(x):
         return f's:{x}'
     raise ValueError(f"Unknown type {type_str}")
 
-    
+###### ---- string functions ---- ######
+
 def cast_to_string(x):
-    if (x is None):
+    if x is None:
         return 'None'
-    if pd.isna(x):
-        return 'nan'
+    if isinstance(x, float):
+        if np.isnan(x):
+            return 'NaN'
+        if np.isinf(x):
+            return 'Inf' if x > 0 else '-Inf'
     try:
-        v = str(x)
-        return v
+        return str(x)
     except ValueError:
         return None
 
-def cast_to_boolean(x):
-    if (x is None) or pd.isna(x):
+# process a string, returning None if the string is empty or Nan, Inf or negInf
+def extract_string(x):
+    if x is None:
         return None
+    if isinstance(x, float) and (math.isnan(x) or math.isinf(x)):
+        return None
+    if isinstance(x, str):
+        x = x.strip()
+        if len(x) == 0:
+            return None
+        return x
+    return None
+
+def is_string(s):
+    return extract_string(s) is not None
+
+###### ---- boolean functions ---- ######
+
+def cast_to_boolean(x):
+    try:
+        if x is None or (isinstance(x, (int, float)) and (np.isnan(x) or np.isinf(x) or np.isneginf(x))):
+            return None
+        return bool(x)
+    except (ValueError, TypeError):
+        return None
+
+# extract a boolean from a boolean or a string
+# return None if the string is empty or does not have a boolean pattern
+def extract_boolean(x):
+    # Check if x is None and return None if it is
+    if x is None:
+        return None
+    
+    # Check if x is NaN or infinity and return None if it is
+    try:
+        if np.isnan(x) or np.isinf(x):
+            return None
+    except TypeError:
+        pass
+    
+    # Check if x is already a boolean and return it if it is
     if isinstance(x, bool):
         return x
-    if isinstance(x, str):
-        x = x.strip().lower()
-        if x == "true":
+    
+    # Attempt to extract a string from x
+    s = extract_string(x)
+    
+    # If a non-empty string was extracted
+    if s is not None:
+        # Convert to lowercase for comparison
+        s = s.lower()
+        
+        # Check if the string represents a boolean value and return the corresponding boolean
+        if s == "true":
             return True
-        if x == "false":
-            return False    
+        if s == "false":
+            return False
+    
+    # If none of the above conditions were met, return None
     return None
+
+###### ---- integer functions ---- ######
+
+def cast_to_integer(x):
+    if (x is None) or isinstance(x, bool):
+        return None
+    if isinstance(x, int):
+        return x
+    if isinstance(x, float):
+        if np.isnan(x) or np.isinf(x) or np.isneginf(x):
+            return None
+        return round_float_to_integer(x)
+    if isinstance(x, str):
+        s = x.strip()
+        if s.isdigit():
+            return int(s)
+        v = float_from_string(s)
+        if v is not None:
+            return round_float_to_integer(v)
+    try:
+        return int(x)
+    except ValueError:
+        return None
+
+# attempt to extract an integer from a an integer, float or string
+# return None if the string is empty or cannot be converted to an integer
+def extract_integer(x):
+    if (x is None) or isinstance(x, bool):
+        return None
+    if np.isnan(x) or np.isinf(x) or np.isneginf(x):
+        return None
+    if isinstance(x, int):
+        return x
+    if isinstance(x, float):
+        return round_float_to_integer(x)
+    if isinstance(x, str):
+        s = x.strip()
+        if s.isdigit():
+            return int(s)
+        v = float_from_string(s)
+        if v is not None:
+            return round_float_to_integer(v)
+    return None
+
+def is_integer(s):
+    return extract_integer(s) is not None
 
 def round_float_to_integer(x):
     if type(x) is not float:
         raise ValueError(f"input must be a float, not ${x.__class__.__name__}")
+    if x is None or np.isnan(x) or np.isinf(x) or np.isneginf(x):
+        return None
     if x < 0.0:
         v = -math.floor(0.5-x)
     elif x > 0.0:
@@ -83,31 +177,15 @@ def round_float_to_integer(x):
     except ValueError:
         return 0
 
-def cast_to_integer(x):
-    if pd.isna(x) or (x is None) or isinstance(x, bool):
-        return None
-    if isinstance(x, int):
-        return x
-    if isinstance(x, float):
-        v = round_float_to_integer(x)
-        return v
-    if isinstance(x, str):
-        s = x.strip()
-        if s.isdigit():
-            return int(s)
-        v = float_from_string(s)
-        if v is not None:
-            return round_float_to_integer(v)
-    return None
-
+###### ---- float functions ---- ######
+# cast a value to a float or return None if the value is None or a boolean
 def cast_to_float(x):
-    if pd.isna(x) or (x is None) or isinstance(x, bool):
+    if (x is None) or isinstance(x, bool):
         return None
     if isinstance(x, float):
+        if np.isnan(x) or np.isinf(x) or np.isneginf(x):
+            return None
         return x
-    if isinstance(x, int):
-        v = float(x)
-        return v
     if isinstance(x, str):
         s = x.strip()
         if s.isdigit():
@@ -115,38 +193,11 @@ def cast_to_float(x):
         v = float_from_string(x)
         if v is not None:
             return v
-    return None
-
-# process a string, returning None if the string is empty or 'nan
-def extract_string(x):
-    if pd.isna(x) or (x is None) or isinstance(x, bool):
+    try:
+        return float(x)
+    except ValueError:
         return None
-    if isinstance(x, str):
-        x = x.strip()
-        if x.lower() == 'nan':
-            return None
-        return x
-    return None
 
-def is_string(s):
-    return extract_string(s) is not None
-
-# attempt to extract an integer from a an integer, float or string
-# return None if the string is empty or cannot be converted to an integer
-def extract_integer(x):
-    if pd.isna(x) or (x is None) or isinstance(x, bool):
-        return None
-    if isinstance(x, int):
-        return x
-    if isinstance(x, float):
-        return round_float_to_integer(x)
-    if isinstance(x, str):
-        s = x.strip()
-        if s.isdigit():
-            return int(s)
-        v = float_from_string(s)
-        if v is not None:
-            return round_float_to_integer(v)
     return None
 
 # return a float from a string or None if the string 
@@ -169,23 +220,38 @@ def has_float_pattern(s):
     except ValueError:
         return False
 
-def is_integer(s):
-    return extract_integer(s) is not None
-
 # extract a float from a float, int or string
 def extract_float(x):
-    if pd.isna(x) or (x is None)  or isinstance(x, bool):
+    # Check if x is None or a boolean and return None if it is
+    if x is None or isinstance(x, bool):
         return None
-    if isinstance(x, int):
-        return float(x)
+    
+    # Check if x is NaN or infinity and return None if it is
+    try:
+        if np.isnan(x) or np.isinf(x):
+            return None
+    except TypeError:
+        pass
+    
+    # Check if x is already a float and return it if it is
     if isinstance(x, float):
         return x
+    
+    # Check if x is an integer and convert it to float
+    if isinstance(x, int):
+        return float(x)
+    
+    # Attempt to extract a string from x
     s = extract_string(x)
+    
+    # If a non-empty string was extracted
     if s is not None:
         try:
             return float(s)
         except ValueError:
             return None
+    
+    # If none of the above conditions were met, return None
     return None
 
 def is_float(s):
@@ -194,23 +260,7 @@ def is_float(s):
 def is_numeric(s):
     return is_integer(s) or is_float(s)
 
-# extract a boolean from a boolean or a string
-def extract_boolean(x):
-    if (x is None):
-        return None
-    if isinstance(x, bool):
-        return x
-    s = extract_string(x)
-    if s is not None:
-        s = s.strip().lower()
-        if s == "true":
-            return True
-        if s == "false":
-            return False
-    return None
-
-def is_boolean(s):
-    return extract_boolean(s) is not None
+###### ---- object functions ---- ######
 
 # extract a list or a dict from the given string
 # or return None if the string has the wrong format
@@ -218,7 +268,9 @@ def is_boolean(s):
 def extract_object(input_str):
     if input_str is None or not isinstance(input_str, str) or len(input_str.strip()) == 0:
         return None
-    
+    if np.isnan(input_str) or np.isinf(input_str) or np.isneginf():
+        return None
+   
     input_str = input_str.strip()
     
     # check if unwrapped has list, dict or tuple syntax
@@ -316,6 +368,9 @@ def extract_status_category(x):
 def is_status_category(s):
     return extract_status_category(s) is not None
 
+
+###### ---- datetime functions ---- ######
+
 # try to extract a pandas.datetime from a 
 # 10-character string or return Non
 def extract_ymd_datetime(s):
@@ -333,10 +388,8 @@ def extract_ymd_datetime(s):
 def is_ymd_datetime(s):
     return extract_ymd_datetime(s) is not None
 
-numeric_column_types = {
-    "integer",
-    "float"
-}
+###### ---- extractpr and column_type functions ---- ######
+
 column_type_extractors = {
     "boolean": extract_boolean,
     "dict": extract_dict,
@@ -346,6 +399,12 @@ column_type_extractors = {
     "float":  extract_float,
     "ymd_datetime": extract_ymd_datetime,
     "status_category": extract_status_category
+}
+column_type_casters = {
+    "boolean": cast_to_boolean,
+    "integer": cast_to_integer,
+    "string": cast_to_string,
+    "float":  cast_to_float
 }
 column_type_dtypes = {
     "boolean": "bool",
@@ -382,6 +441,11 @@ column_types = {
     "video": "boolean",
     "vote_average": "float",
     "vote_count": "integer"
+}
+
+numeric_column_types = {
+    "integer",
+    "float"
 }
 
 def is_float_column_type(col):
@@ -470,6 +534,7 @@ def compute_make_all_values_match_column_type(df, col, column_type_matcher, mess
 
 def process_columns(df):
     processed_columns = []
+    column_errors = {}
     for col in df.columns:
         column_type = column_types.get(col)
         if column_type is None:
@@ -497,41 +562,37 @@ def process_columns(df):
             non_matching_unique_values = df[col].dropna()[non_matching_mask].unique()
             n = len(non_matching_unique_values)
             if n > 0:
+                error_lines = []
                 for v in non_matching_unique_values:
-                    save_column_error(col, v)
+                    error_lines.append(f"Column: {col} Value: {v} does not match column type: {column_type}")
+                pre_wrapped = "\n".join(error_lines)
+                column_errors[col] = pre_wrapped
                     
-                    
-    column_type_errors_path = "./column_type_errors.txt"
-    print("saving column_type errors to:" + column_type_errors_path)         
-    with open (column_type_errors_path,"w") as f:
-        tee = Tee(f)
         
         # dashed line as run delimiter
-        print(('-') * 80, file=tee)
+        process_columns_logger.info(('-') * 80)
         
-        print(f"process_columns run started at: {pd.Timestamp.now().isoformat()}", file=tee)
-        print("", file=tee)
+        process_columns_logger.info(f"process_columns run started at: {pd.Timestamp.now().isoformat()}")
+        process_columns_logger.info("")
 
         skipped_columns = [col for col in df.columns if col not in column_errors]
-        print(f"Skipped columns: {skipped_columns}", file=tee)
-        print("", file=tee)
-        print(f"Processed columns: {processed_columns}", file=tee)
+        process_columns_logger.info(f"Skipped columns: {skipped_columns}")
+        process_columns_logger.info("")
+        process_columns_logger.info(f"Processed columns: {processed_columns}")
         for col in column_errors:
             coltype = get_column_type(col)
             errors = column_errors[col]
             num_errors = len(errors)
-            print(f"Column: [{col}] [{coltype}] has {num_errors} errors", file=tee)
+            process_columns_logger.info(f"Column: [{col}] [{coltype}] has {num_errors} errors")
             for index, error in enumerate(errors):
                 wrapped_error = textwrap.fill(f"column: '{col}': error: {index+1}/{num_errors}\n>|{error}|<", width=80)
-                print(wrapped_error, file=tee)
-                tee.flush()
+                process_columns_logger.info("", extra={"pre-wrapped", wrapped_error})
     
-        print("", file=tee)
-        print(f"process_columns run finished at: {pd.Timestamp.now().isoformat()}", file=tee)
-        print("", file=tee)
-        tee.flush()
+        process_columns_logger.info("")
+        process_columns_logger.info(f"process_columns run finished at: {pd.Timestamp.now().isoformat()}")
+        process_columns_logger.info("")
 
-    print("done")
+    process_columns_logger.info("done")
 
     return df
     
