@@ -1,4 +1,4 @@
-from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime, cast_to_string, cast_to_boolean, cast_to_float, cast_to_integer, p_typed_value, fNaN, fnan, fInf, finf
+from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime, p_typed_value, fNaN, fInf
 from unittest import TestCase
 import pandas as pd
 
@@ -177,11 +177,11 @@ class TestColumnTypes(TestCase):
             'B': [4.5, None, None],
             'C': [7.0, None, None]
         }
-        error_message = self.print_and_compare("cast all values to float", input_data, expected_data, cast_to_float)
+        error_message = self.print_and_compare("cast all values to float", input_data, expected_data, extract_float)
         if error_message:
             self.fail(error_message)
     
-    def test_cast_all_values_to_boolean(self):
+    def test_extract_boolean_from_all_values(self):
         input_data = {
             'A': ['true', 'FALSE', 'a'],
             'B': ['4.5', '5.6', True],
@@ -192,11 +192,11 @@ class TestColumnTypes(TestCase):
             'B': [None, None, True],
             'C': [None, None, False]
         }
-        error_message = self.print_and_compare("test_cast_all_values_to_booleans", input_data, expected_data, cast_to_boolean)
+        error_message = self.print_and_compare("test_extract_boolean_from_all_valuess", input_data, expected_data, extract_boolean)
         if error_message:
             self.fail(error_message)
 
-    def test_cast_all_values_to_integer(self):
+    def test_extract_integer_from_all_values(self):
         # if integer columns dtypes are not specified, then 
         # because any column with both None (or Nan) and 
         # numeric values is considered mixed. and mixed 
@@ -214,11 +214,11 @@ class TestColumnTypes(TestCase):
             'B': [6, None, None],
             'C': [7, -9, None]
         }
-        error_message = self.print_and_compare("test_cast_all_values_to_integer", input_data, expected_data, cast_to_integer)
+        error_message = self.print_and_compare("test_extract_integer_from_all_values", input_data, expected_data, extract_integer)
         if error_message:
             self.fail(error_message)
             
-    def test_cast_all_values_to_string(self):
+    def test_extract_string_from_all_values(self):
         input_data = {
             'A': [1, '2', '{"a": 7}' ],
             'B': ['happy', 'day\\\'s', '[{"b": 8},{"c": 9}]' ],
@@ -229,7 +229,7 @@ class TestColumnTypes(TestCase):
             'B': ['happy', 'day\\\'s', '[{"b": 8},{"c": 9}]' ],
             'C': ['7', 'True', '(1,2,3)']
         }
-        error_message = self.print_and_compare("test_cast_all_values_to_strings", input_data, expected_data, cast_to_string)
+        error_message = self.print_and_compare("test_extract_string_from_all_valuess", input_data, expected_data, extract_string)
         if error_message:
             self.fail(error_message)
         print()
@@ -237,7 +237,7 @@ class TestColumnTypes(TestCase):
     # return an error_message if any of the result values
     # don't match the expected values.
     # otherwise, return None if there are no errors
-    def print_and_compare(self, test_name, data_input, data_expected, value_converter):
+    def print_and_compare(self, test_name, data_input, data_expected, column_type_extractor):
         print('=' * 80)
         print(test_name)
         
@@ -250,17 +250,17 @@ class TestColumnTypes(TestCase):
         print(df_expected)
         
         print("df_result:-----------------------------------")
-        df_result = self.map_all_columns(df_input, value_converter)
+        df_result = self.map_all_columns(df_input, column_type_extractor)
         print(df_result)
         
-        print(f"{cast_to_integer(6.0)}")
+        print(f"{extract_integer(6.0)}")
         
         error_message = self.df_compare(test_name, df_expected, df_result)
         if error_message:
             self.fail(error_message)
 
-    def map_all_columns(self, df, value_converter):
-       return df.apply(lambda col: col.map(value_converter))
+    def map_all_columns(self, df, column_type_extractor):
+       return df.apply(lambda col: col.map(column_type_extractor))
    
     def df_compare(self, test_name, df_exp, df_rst):
         str_exp = df_exp.to_string().replace('\n', '')
@@ -292,50 +292,50 @@ class TestColumnTypes(TestCase):
             return min_length
         return -1  # Return -1 if the strings are identical
     
-    def test_type_casters(self):
-        self.assertTrue(cast_to_integer(fNaN) is None, "Error should have returned None")
-        self.assertTrue(cast_to_integer(fInf) is None, "Error should have returned None")
-        self.assertTrue(cast_to_integer(-fInf) is None, "Error should have returned None")
-        self.assertTrue(cast_to_integer(None) is None, "Error should have returned None")
-        self.assertTrue(cast_to_integer(True) is None, "Error should have returned None")
-        self.assertTrue(cast_to_integer(False) is None, "Error should have returned None")
-        self.assertTrue(cast_to_integer("hot's") is None, "Error should have returned None")
-        self.assertTrue(cast_to_integer("") is None, "Error should have returned None")
+    def test_column_type_extractors(self):
+        self.assertTrue(extract_integer(fNaN) is None, "Error should have returned None")
+        self.assertTrue(extract_integer(fInf) is None, "Error should have returned None")
+        self.assertTrue(extract_integer(-fInf) is None, "Error should have returned None")
+        self.assertTrue(extract_integer(None) is None, "Error should have returned None")
+        self.assertTrue(extract_integer(True) is None, "Error should have returned None")
+        self.assertTrue(extract_integer(False) is None, "Error should have returned None")
+        self.assertTrue(extract_integer("hot's") is None, "Error should have returned None")
+        self.assertTrue(extract_integer("") is None, "Error should have returned None")
         
-        self.assertTrue(cast_to_float(fNaN) is None, "Error should have returned None")
-        self.assertTrue(cast_to_float(fInf) is None, "Error should have returned None")
-        self.assertTrue(cast_to_float(-fInf) is None, "Error should have returned None")
-        self.assertTrue(cast_to_float(None) is None, "Error should have returned None")
-        self.assertTrue(cast_to_float(True) is None, "Error should have returned None")
-        self.assertTrue(cast_to_float(False) is None, "Error should have returned None")
-        self.assertTrue(cast_to_float(False) is None, "Error should have returned None")
-        self.assertTrue(cast_to_float("hot's") is None, "Error should have returned None")
-        self.assertTrue(cast_to_float("") is None, "Error should have returned None")
+        self.assertTrue(extract_float(fNaN) is None, "Error should have returned None")
+        self.assertTrue(extract_float(fInf) is None, "Error should have returned None")
+        self.assertTrue(extract_float(-fInf) is None, "Error should have returned None")
+        self.assertTrue(extract_float(None) is None, "Error should have returned None")
+        self.assertTrue(extract_float(True) is None, "Error should have returned None")
+        self.assertTrue(extract_float(False) is None, "Error should have returned None")
+        self.assertTrue(extract_float(False) is None, "Error should have returned None")
+        self.assertTrue(extract_float("hot's") is None, "Error should have returned None")
+        self.assertTrue(extract_float("") is None, "Error should have returned None")
 
-        self.assertTrue(cast_to_boolean(fNaN) is None, "Error should have returned None")
-        self.assertTrue(cast_to_boolean(fInf) is None, "Error should have returned None")
-        self.assertTrue(cast_to_boolean(-fInf) is None, "Error should have returned None")
-        self.assertTrue(cast_to_boolean(None) is None, "Error should have returned None")
-        self.assertTrue(cast_to_boolean(True) is True, "Error should have returned True")
-        self.assertTrue(cast_to_boolean(False) is False, "Error should have returned False")
-        self.assertTrue(cast_to_boolean("hot's") is None, "Error should have returned None")
-        self.assertTrue(cast_to_boolean("") is None, "Error should have returned None")
+        self.assertTrue(extract_boolean(fNaN) is None, "Error should have returned None")
+        self.assertTrue(extract_boolean(fInf) is None, "Error should have returned None")
+        self.assertTrue(extract_boolean(-fInf) is None, "Error should have returned None")
+        self.assertTrue(extract_boolean(None) is None, "Error should have returned None")
+        self.assertTrue(extract_boolean(True) is True, "Error should have returned True")
+        self.assertTrue(extract_boolean(False) is False, "Error should have returned False")
+        self.assertTrue(extract_boolean("hot's") is None, "Error should have returned None")
+        self.assertTrue(extract_boolean("") is None, "Error should have returned None")
 
-        self.assertTrue(cast_to_string(fNaN) == 'nan', "Error should have returned 'nan'")
-        self.assertTrue(cast_to_string(fInf) == 'finf', "Error should have returned 'finf'")
-        self.assertTrue(cast_to_string(-fInf) == '-finf', "Error should have returned '-finf'")
-        self.assertTrue(cast_to_string(None) == 'None', "Error should have returned 'None'")
-        self.assertTrue(cast_to_string(True) == 'True', "Error should have returned 'True'")
-        self.assertTrue(cast_to_string(False) == 'False', "Error should have returned 'False'")
-        self.assertTrue(cast_to_string("hot's") == "hot's", "Error should have returned hot's")
-        self.assertTrue(cast_to_string("") == "", "Error should have returned ''")
+        self.assertTrue(extract_string(fNaN) == 'NaN', "Error should have returned 'nan'")
+        self.assertTrue(extract_string(fInf) == 'Inf', "Error should have returned 'finf'")
+        self.assertTrue(extract_string(-fInf) == '-Inf', "Error should have returned '-finf'")
+        self.assertTrue(extract_string(None) == 'None', "Error should have returned 'None'")
+        self.assertTrue(extract_string(True) == 'True', "Error should have returned 'True'")
+        self.assertTrue(extract_string(False) == 'False', "Error should have returned 'False'")
+        self.assertTrue(extract_string("hot's") == "hot's", "Error should have returned hot's")
+        self.assertTrue(extract_string("") == "", "Error should have returned ''")
 
         values = [fNaN, True, False, 'True', 'False', 'true', 'false', 1, '1', 1.0, '1.0', None, 'None', "hot's", 'hot\\\'s']
-        type_casters  = [cast_to_boolean, cast_to_integer, cast_to_float, cast_to_string]
+        column_type_extractors  = [extract_boolean, extract_integer, extract_float, extract_string]
         for value in values:
-            for type_caster in type_casters:
-                result = type_caster(value)
-                print(f"{type_caster.__name__}({p_typed_value(value)}) -> {p_typed_value(result)}")
+            for extractor in column_type_extractors:
+                result = extractor(value)
+                print(f"{extractor.__name__}({p_typed_value(value)}) -> {p_typed_value(result)}")
   
         
         

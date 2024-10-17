@@ -1,15 +1,13 @@
-import ast
 import json
 import math
-import re
+import textwrap
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 
-from thread_utils import run_with_message
-
 from column_errors_logger import logger as process_columns_logger
-import textwrap
+from thread_utils import run_with_message
 
 fnan = fNaN = np.nan
 finf = fInf = np.inf
@@ -38,7 +36,9 @@ def p_typed_value(x):
 
 ###### ---- string functions ---- ######
 
-def cast_to_string(x):
+# get a string from the given value
+# even if the value is None, NaN, or Inf
+def extract_string(x: Any) -> Optional[str]:
     if x is None:
         return 'None'
     if isinstance(x, float):
@@ -47,39 +47,23 @@ def cast_to_string(x):
         if np.isinf(x):
             return 'Inf' if x > 0 else '-Inf'
     try:
+        if isinstance(x, str):
+            x = x.strip()
+            if len(x) == 0:
+                return None
+            return x
         return str(x)
     except ValueError:
         return None
 
-# process a string, returning None if the string is empty or Nan, Inf or negInf
-def extract_string(x):
-    if x is None:
-        return None
-    if isinstance(x, float) and (math.isnan(x) or math.isinf(x)):
-        return None
-    if isinstance(x, str):
-        x = x.strip()
-        if len(x) == 0:
-            return None
-        return x
-    return None
-
-def is_string(s):
+def is_string(s: Any) -> bool:
     return extract_string(s) is not None
 
 ###### ---- boolean functions ---- ######
 
-def cast_to_boolean(x):
-    try:
-        if x is None or (isinstance(x, (int, float)) and (np.isnan(x) or np.isinf(x) or np.isneginf(x))):
-            return None
-        return bool(x)
-    except (ValueError, TypeError):
-        return None
-
 # extract a boolean from a boolean or a string
 # return None if the string is empty or does not have a boolean pattern
-def extract_boolean(x):
+def extract_boolean(x: Any) -> Optional[bool]:
     # Check if x is None and return None if it is
     if x is None:
         return None
@@ -114,7 +98,7 @@ def extract_boolean(x):
 
 ###### ---- integer functions ---- ######
 
-def cast_to_integer(x):
+def extract_integer(x: Any) -> Optional[int]:
     if (x is None) or isinstance(x, bool):
         return None
     if isinstance(x, int):
@@ -135,30 +119,10 @@ def cast_to_integer(x):
     except ValueError:
         return None
 
-# attempt to extract an integer from a an integer, float or string
-# return None if the string is empty or cannot be converted to an integer
-def extract_integer(x):
-    if (x is None) or isinstance(x, bool):
-        return None
-    if np.isnan(x) or np.isinf(x) or np.isneginf(x):
-        return None
-    if isinstance(x, int):
-        return x
-    if isinstance(x, float):
-        return round_float_to_integer(x)
-    if isinstance(x, str):
-        s = x.strip()
-        if s.isdigit():
-            return int(s)
-        v = float_from_string(s)
-        if v is not None:
-            return round_float_to_integer(v)
-    return None
-
-def is_integer(s):
+def is_integer(s: Any) -> bool:
     return extract_integer(s) is not None
 
-def round_float_to_integer(x):
+def round_float_to_integer(x: float) -> Optional[int]:
     if type(x) is not float:
         raise ValueError(f"input must be a float, not ${x.__class__.__name__}")
     if x is None or np.isnan(x) or np.isinf(x) or np.isneginf(x):
@@ -177,9 +141,12 @@ def round_float_to_integer(x):
     except ValueError:
         return 0
 
+
 ###### ---- float functions ---- ######
-# cast a value to a float or return None if the value is None or a boolean
-def cast_to_float(x):
+
+# extract a float value from a float, int or string
+# or return None if the value is None, Nan, Inf, or a boolean
+def extract_float(x: Any) -> Optional[float]:
     if (x is None) or isinstance(x, bool):
         return None
     if isinstance(x, float):
@@ -202,7 +169,7 @@ def cast_to_float(x):
 
 # return a float from a string or None if the string 
 # is empty or does not have a float pattern
-def float_from_string(s):
+def float_from_string(s: str) -> Optional[float]:
     if not isinstance(s, str):
         raise ValueError("input must be a string")
     try:
@@ -213,51 +180,17 @@ def float_from_string(s):
     except ValueError:
         return None
     
-def has_float_pattern(s):
+def has_float_pattern(s: Any) -> bool:
     try:
         float(s)
         return True
     except ValueError:
         return False
 
-# extract a float from a float, int or string
-def extract_float(x):
-    # Check if x is None or a boolean and return None if it is
-    if x is None or isinstance(x, bool):
-        return None
-    
-    # Check if x is NaN or infinity and return None if it is
-    try:
-        if np.isnan(x) or np.isinf(x):
-            return None
-    except TypeError:
-        pass
-    
-    # Check if x is already a float and return it if it is
-    if isinstance(x, float):
-        return x
-    
-    # Check if x is an integer and convert it to float
-    if isinstance(x, int):
-        return float(x)
-    
-    # Attempt to extract a string from x
-    s = extract_string(x)
-    
-    # If a non-empty string was extracted
-    if s is not None:
-        try:
-            return float(s)
-        except ValueError:
-            return None
-    
-    # If none of the above conditions were met, return None
-    return None
-
-def is_float(s):
+def is_float(s: Any) -> bool:
     return extract_float(s) is not None
 
-def is_numeric(s):
+def is_numeric(s: Any) -> bool:
     return is_integer(s) or is_float(s)
 
 ###### ---- object functions ---- ######
@@ -265,72 +198,56 @@ def is_numeric(s):
 # extract a list or a dict from the given string
 # or return None if the string has the wrong format
 # or cannot be json-parsed
-def extract_object(input_str):
-    if input_str is None or not isinstance(input_str, str) or len(input_str.strip()) == 0:
+
+def extract_object(input_data: Any) -> Optional[Union[List, Dict]]:
+    """
+    Extract a list or a dict from the given input_data.
+    Return None if the string has the wrong format or cannot be parsed.
+
+    Args:
+        input_data (str): The input string to parse.
+
+    Returns:
+        Optional[Union[List, Dict]]: The parsed object or None if parsing fails.
+    """
+    if not isinstance(input_data, str) or not input_data.strip():
         return None
-    if np.isnan(input_str) or np.isinf(input_str) or np.isneginf():
+
+    input_data = input_data.strip()
+
+    # Remove surrounding quotes if present
+    if (input_data.startswith('"') and input_data.endswith('"')) or \
+       (input_data.startswith("'") and input_data.endswith("'")):
+        input_data = input_data[1:-1].strip()
+
+    # Check if the string starts with a valid character for a list or dict
+    if not input_data.startswith(('[', '{')):
         return None
-   
-    input_str = input_str.strip()
-    
-    # check if unwrapped has list, dict or tuple syntax
-    if input_str[0] in ['"', "'"] and input_str[-1] == input_str[0]:
-        unwrapped = input_str[1:-1].strip()
-        if unwrapped[0] not in '[{(':
-            return None
-    
+
+    # Try parsing as JSON
     try:
-        y = json.loads(input_str)
-        if isinstance(y, (list, dict)):
-            return y
-    except (json.JSONDecodeError, ValueError, TypeError):
-        # print(f"Debug Error 1: {e}")
-        # print(f"on json.loads on input_str: {input_str}")
+        parsed_data = json.loads(input_data)
+        if isinstance(parsed_data, (list, dict)):
+            return parsed_data
+    except json.JSONDecodeError:
+        pass
 
-        # try a literal evaluation
-        # e.g. input_str: '[{\'name\': \'The Booking\'s Office\'}]'
-        try:
-            y = ast.literal_eval(input_str)
-            if y is not None and isinstance(y, (list, dict)):
-                return y
-        except (ValueError, SyntaxError) as e:
-            print(f"Debug Error 2: {e}")
-            print(f"on literal eval on input_str: {input_str}")
+    # If JSON parsing fails, try fixing common issues
+    fixed_data = input_data.replace("'", '"').replace("None", "null")
+    try:
+        parsed_data = json.loads(fixed_data)
+        if isinstance(parsed_data, (list, dict)):
+            return parsed_data
+    except json.JSONDecodeError:
+        pass
 
-            # replace internal single quotes with encoded form
-            fixed_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', input_str)
-            # replace all remaining single quotes with double quotes
-            fixed_str = fixed_str.replace("'", '"')
-            # decode the encoded single quotes
-            fixed_str = fixed_str.replace('\\u0027', "'")
-            # replace python None with Json null
-            fixed_str = fixed_str.replace("None", "null")
-            
-            try:
-                y = json.loads(fixed_str)
-                if isinstance(y, (list, dict)):
-                    return y
-            except (json.JSONDecodeError, ValueError, TypeError) as e:
-                print(f"Debug Error 3: {e}")
-                print(f"on json.loads on fixed_str: {fixed_str}")
-                
-                # If the JSON decoder fails, try to fix the quotes in the JSON string
-                # This regular expression targets single quotes that are likely part of the content
-                final_str = re.sub(r"(?<=\w)'(?=\w)", r'\\u0027', fixed_str)
-                try:
-                    y = json.loads(final_str)
-                    if isinstance(y, (list, dict)):
-                        return y
-                except (json.JSONDecodeError, ValueError, TypeError) as e:
-                    print(f"Debug Error 4: {e}")
-                    print(f"json.loads on final_str: {final_str}")
-                    
-                    # If the JSON decoder fails again, return None
-                    return None
+    # If all parsing attempts fail, return None
+    return None
+
 
 # attempt to extract a dict object from the given string
 # or return None if the string cannot be json-parsed
-def extract_dict(s):
+def extract_dict(s: Any) -> Optional[Dict]:
     v = extract_object(s)
     if isinstance(v, dict):
         return v
@@ -339,13 +256,13 @@ def extract_dict(s):
 # return true if the given string 
 # can be json-parsed into a possibly empty 
 # dict otherwise return false
-def is_dict(x):
+def is_dict(x: Any) -> bool:
     return extract_dict(x) is not None
 
 # attempt to extract a list of at least one dict from 
 # the given string or return None if the string 
 # cannot be json-parsed
-def extract_list_of_dict(s):
+def extract_list_of_dict(s: Any) -> Optional[List[Dict]]:
     v = extract_object(s)
     if v is not None and isinstance(v, list):
         if len(v) > 0:
@@ -355,17 +272,17 @@ def extract_list_of_dict(s):
         return None
     return None
 
-def is_list_of_dict(x):
+def is_list_of_dict(x: Any) -> bool:
     return extract_list_of_dict(x) is not None
 
-def extract_status_category(x):
+def extract_status_category(x: Any) -> Optional[str]:
     if extract_string(x) is not None:
         x = x.strip()
         if x in ["Rumored", "Planned", "In Production", "Post Production", "Released", "Canceled"]:
             return x
     return None
 
-def is_status_category(s):
+def is_status_category(s: Any) -> bool:
     return extract_status_category(s) is not None
 
 
@@ -373,7 +290,7 @@ def is_status_category(s):
 
 # try to extract a pandas.datetime from a 
 # 10-character string or return Non
-def extract_ymd_datetime(s):
+def extract_ymd_datetime(s: Any) -> Optional[pd.Timestamp]:
     t = extract_string(s)
     if t is not None and isinstance(t, str):
         # yyyy-mm-dd is strictly 10 chars in length
@@ -385,7 +302,7 @@ def extract_ymd_datetime(s):
             return None
     return None
 
-def is_ymd_datetime(s):
+def is_ymd_datetime(s: Any) -> bool:
     return extract_ymd_datetime(s) is not None
 
 ###### ---- extractpr and column_type functions ---- ######
@@ -399,12 +316,6 @@ column_type_extractors = {
     "float":  extract_float,
     "ymd_datetime": extract_ymd_datetime,
     "status_category": extract_status_category
-}
-column_type_casters = {
-    "boolean": cast_to_boolean,
-    "integer": cast_to_integer,
-    "string": cast_to_string,
-    "float":  cast_to_float
 }
 column_type_dtypes = {
     "boolean": "bool",
@@ -448,27 +359,27 @@ numeric_column_types = {
     "float"
 }
 
-def is_float_column_type(col):
+def is_float_column_type(col: str) -> bool:
     if get_column_type(col) == "float":
         return True
     return False
 
-def is_numeric_column_type(col):
+def is_numeric_column_type(col: str) -> bool:
     if get_column_type(col) in numeric_column_types:
         return True
     return False
 
-def get_numeric_columns(df):
+def get_numeric_columns(df: pd.DataFrame) -> List[str]:
     return [col for col in df.columns if is_numeric_column_type(col)]
     
-def get_column_type(col):
+def get_column_type(col: str) -> str:
     column_type = column_types.get(col)
     if column_type is not None:
         return column_type
     else:
         raise ValueError(f"Error: no column type found for column: '{col}'")
     
-def get_column_dtype(col):
+def get_column_dtype(col: str) -> str:
     column_type = get_column_type(col)
     column_dtype = column_type_dtypes.get(column_type)
     if column_dtype is not None:
@@ -476,17 +387,17 @@ def get_column_dtype(col):
     else:
         raise ValueError(f"no column dtype found for column_type:{column_type}")
 
-def get_column_type_extractor(column_type):
+def get_column_type_extractor(column_type: str) -> Any:
     extractor = column_type_extractors.get(column_type)
     if extractor is not None:
         return extractor
     else:
         raise ValueError(f"no extractor found for column_type: {column_type}")
 
-def get_column_extractor(col):
+def get_column_extractor(col: str) -> Any:
     return get_column_type_extractor(get_column_type(col))
 
-def get_column_names_from_csv_file(csv_path):
+def get_column_names_from_csv_file(csv_path: str) -> List[str]:
     with open(csv_path, "r") as f:
         first_row = f.readline().split(',')
     column_names = [first_row[i].strip() for i in range(len(first_row))]
@@ -494,16 +405,16 @@ def get_column_names_from_csv_file(csv_path):
         raise ValueError("item count failure")     
     return column_names
 
-def get_column_names_from_df(df):
+def get_column_names_from_df(df: pd.DataFrame) -> List[str]:
     return df.columns
 
-def verify_all_columns_have_extractors(df):
+def verify_all_columns_have_extractors(df: pd.DataFrame) -> None:
     # a ValueError will be raised on the
     # first column that has no extractor
     for col in df.columns:
         get_column_extractor(col)
 
-def verify_column_names(csv_path, df):
+def verify_column_names(csv_path: str, df: pd.DataFrame) -> None:
     # raise ValueError if column names don't match
     csv_columns = get_column_names_from_csv_file(csv_path)
     df_columns = get_column_names_from_df(df)
@@ -520,10 +431,10 @@ def verify_column_names(csv_path, df):
         if len(errors) > 0:
             raise ValueError(",".join(errors))
 
-def make_all_values_match_column_type(df, col, column_type_matcher):
+def make_all_values_match_column_type(df: pd.DataFrame, col: str, column_type_matcher: Any) -> bool:
     return df[col].dropna().apply(column_type_matcher).all()
 
-def compute_make_all_values_match_column_type(df, col, column_type_matcher, message, interval_seconds):
+def compute_make_all_values_match_column_type(df: pd.DataFrame, col:str, column_type_matcher:Any, message:str, interval_seconds:int) -> None:
     run_with_message(make_all_values_match_column_type, args=(df, col, column_type_matcher), message=message, interval_seconds=interval_seconds)                                          
 
 # process the columns of the DataFrame
@@ -532,7 +443,7 @@ def compute_make_all_values_match_column_type(df, col, column_type_matcher, mess
 # that cannot be converted to None and log the errors
 # for the option of future processing
 
-def process_columns(df):
+def process_columns(df: pd.DataFrame) -> pd.DataFrame:
     processed_columns = []
     column_errors = {}
     for col in df.columns:

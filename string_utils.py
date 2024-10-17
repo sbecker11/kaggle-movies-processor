@@ -139,4 +139,3 @@ def format_value(value, val_size, fill_width, justify=None):
         if json_str and json_str != 'null':
             value = json_str
         return format_string(value, val_size, fill_width, justify=(justify or Justify.RIGHT))
-
