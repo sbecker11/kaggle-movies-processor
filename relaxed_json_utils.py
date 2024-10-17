@@ -83,39 +83,3 @@ def get_detailed_type(obj):
     else:
         return type(obj).__name__
 
-def test_relaxed_json():
-    test_cases = [
-        '{"key": "value", "number": 42}',
-        '{key: value, number: 42}',
-        '[{name: "John", age: 30}, {"name": Alice, "age": 25}]',
-        '42',
-        '{"name": "le\'Accident", "type": unquoted}',
-        '{complex: "string with \\"internal\\" double quotes"}',
-        '[{name: single\'quote, age: 30}, {"name": "double\\"quote", "age": 25}]',
-        '{key: value with spaces, another: 42}',
-        '{"key": "value with spaces", "another": 42}',
-        '{mixed: value with spaces, "quoted": "string with spaces"}',
-        '[{name: John Doe, age: 30}, {"name": "Jane Doe", "job": software engineer}]',
-        'This is a naked string',
-        'true',
-        'false',
-        'null',
-        '3.14159',
-        '["a", "b", "c"]',
-        '[]',
-        '{}',
-    ]
-
-    for i, json_str in enumerate(test_cases, 1):
-        print(f"Test case {i}: {json_str}")
-        try:
-            result = read_relaxed_json(io.StringIO(json_str))
-            detailed_type = get_detailed_type(result)
-            print(f"Parsed type: {detailed_type}")
-            print(f"Result: {result}")
-        except Exception as e:
-            print(f"Error: {e}")
-        print()
-
-if __name__ == '__main__':
-    test_relaxed_json()
