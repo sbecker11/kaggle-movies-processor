@@ -30,6 +30,7 @@ class TestRelaxedJsonUtils(TestCase):
             ('{}', "Empty Dict"),
         ]
         num_errors = 0
+        num_tests = len(test_cases)
         json_str_errors = []
         for i, tuple in enumerate(test_cases, 1):
             json_str, expected = tuple
@@ -47,7 +48,7 @@ class TestRelaxedJsonUtils(TestCase):
 
         for json_str in json_str_errors:
             print(f"Error found in test_relaxed_json for : {json_str}")
-        self.assertEqual(0, num_errors, "Errors found in test_relaxed_json")
+        self.assertEqual(0, num_errors, f"{num_errors}/{num_tests} found in test_relaxed_json")
     
     
     def test_get_detailed_type(self):
@@ -58,8 +59,8 @@ class TestRelaxedJsonUtils(TestCase):
             (True, 'bool'),
             (False, 'bool'),
             (None, 'NoneType'),
-            ({'key': 'value'}, 'dict'),
-            ([1, 2, 3], 'list'),
+            ({'key': 'value'}, 'Dict'),
+            ([1, 2, 3], 'List(int)'),
             (pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]}), 'DataFrame'),
         ]
         json_str_errors = []
