@@ -84,6 +84,9 @@ def get_detailed_type(obj):
         else:
             return "List[Any]"
     elif isinstance(obj, dict):
+        keys = obj.keys()
+        if not keys:
+            return "Empty Dict"
         return "Dict"
     else:
         return type(obj).__name__
