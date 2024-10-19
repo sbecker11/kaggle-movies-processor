@@ -9,17 +9,17 @@ class TestRelaxedJsonUtils(TestCase):
     
     def test_relaxed_json(sel):
         test_cases = [
-            '{"key": "value", "number": 42}',
-            '{key: value, number: 42}',
+            '{"key": "value", "number": 4}',
+            '{key: value, number: 40}',
             '[{name: "John", age: 30}, {"name": Alice, "age": 25}]',
-            '42',
+            '44',
             '{"name": "le\'Accident", "type": unquoted}',
             '{complex: "string with \\"internal\\" double quotes"}',
-            '[{name: single\'quote, age: 30}, {"name": "double\\"quote", "age": 25}]',
-            '{key: value with spaces, another: 42}',
+            '[{name: single\'quote, age: 31}, {"name": "double\\"quote", "age": 25}]',
+            '{key: value with spaces, another: 41}',
             '{"key": "value with spaces", "another": 42}',
             '{mixed: value with spaces, "quoted": "string with spaces"}',
-            '[{name: John Doe, age: 30}, {"name": "Jane Doe", "job": software engineer}]',
+            '[{name: John Doe, age: 32}, {"name": "Jane Doe", "job": software engineer}]',
             'This is a naked string',
             'true',
             'false',
@@ -43,7 +43,7 @@ class TestRelaxedJsonUtils(TestCase):
     
     def test_get_detailed_type(self):
         test_cases = [
-            (42, 'int'),
+            (43, 'int'),
             (3.14159, 'float'),
             ('This is a string', 'str'),
             (True, 'bool'),

@@ -1,6 +1,7 @@
 from column_types import extract_dict, extract_object, extract_string, extract_integer, extract_float, extract_boolean, extract_list_of_dict, extract_ymd_datetime, p_typed_value, fNaN, fInf
 from unittest import TestCase
 import pandas as pd
+from dataframe_test_utils import DataFrameTestUtils
 
 class TestColumnTypes(TestCase):
 
@@ -233,7 +234,62 @@ class TestColumnTypes(TestCase):
         if error_message:
             self.fail(error_message)
         print()
+        
+    def test_extract_float_from_all_values(self):
+        input_data = {
+            'A': [1, 2, 'a'],
+            'B': [5.5, False, None],
+            'C': [7, -8.5, 'B']
+        }
+        expected_data = {
+            'A': [1.0, 2.0, None],
+            'B': [5.5, None, None],
+            'C': [7.0, -8.5, None]
+        }
+        error_message = self.print_and_compare("test_extract_float_from_all_values", input_data, expected_data, extract_float)
+        if error_message:
+            self.fail(error_message)
+            
+    def test_extract_dict_from_all_values(self):
+        input_data = {
+            'A': [1, 2, 'a'],
+            'B': [5.5, False, None],
+            'C': [7, -8.5, 'B']
+        }
+        expected_data = {
+            'A': [None, None, None],
+            'B': [None, None, None],
+            'C': [None, None, None]
+        }
+        error_message = self.print_and_compare("test_extract_dict_from_all_values", input_data, expected_data, extract_dict)
+        if error_message:
+            self.fail(error_message)
+    
+    def test_extract_objects_from_all_values(self):
+        
+        c1_str = '[{first_name: joe}, {last_name: \'johnson\'}, {"age":24.1234}]'
+        c1_obj = [{'first_name': 'joe'}, {'last_name': 'johnson'}, {'age': 24.1234}]
+        b2_str = "{'first_name': 'harry', 'last_name': 'potter'}"
+        b2_obj = {'first_name': 'harry', 'last_name': 'potter'}
+        a3_str = '[1,2,3,4]'
+        a3_obj = [1,2,3,4]
 
+        input_data = {
+            'A': [1, 2, a3_str],
+            'B': [5.5, b2_str, None],
+            'C': [c1_str, [], [] ]
+        }
+        expected_data = {
+            'A': [None, None, a3_obj],
+            'B': [None, b2_obj, None],
+            'C': [c1_obj, None, None]
+        }
+        utils = DataFrameTestUtils()
+        testname = "test_extract_objects_from_all_values"
+        num_diff = utils.dfs_test_extractor(testname, input_data, expected_data, extract_object)
+        self.assertEqual(0, num_diff, "result should match expected")
+
+                
     # return an error_message if any of the result values
     # don't match the expected values.
     # otherwise, return None if there are no errors
@@ -262,6 +318,7 @@ class TestColumnTypes(TestCase):
     def map_all_columns(self, df, column_type_extractor):
        return df.apply(lambda col: col.map(column_type_extractor))
    
+        
     def df_compare(self, test_name, df_exp, df_rst):
         str_exp = df_exp.to_string().replace('\n', '')
         str_rst = df_rst.to_string().replace('\n', '')
@@ -321,14 +378,14 @@ class TestColumnTypes(TestCase):
         self.assertTrue(extract_boolean("hot's") is None, "Error should have returned None")
         self.assertTrue(extract_boolean("") is None, "Error should have returned None")
 
-        self.assertTrue(extract_string(fNaN) == 'NaN', "Error should have returned 'nan'")
-        self.assertTrue(extract_string(fInf) == 'Inf', "Error should have returned 'finf'")
-        self.assertTrue(extract_string(-fInf) == '-Inf', "Error should have returned '-finf'")
-        self.assertTrue(extract_string(None) == 'None', "Error should have returned 'None'")
+        self.assertTrue(extract_string(fNaN) is None, "Error should have returned None")
+        self.assertTrue(extract_string(fInf) is None, "Error should have returned None")
+        self.assertTrue(extract_string(-fInf) is None, "Error should have returned None")
+        self.assertTrue(extract_string(None) is None, "Error should have returned None")
         self.assertTrue(extract_string(True) == 'True', "Error should have returned 'True'")
         self.assertTrue(extract_string(False) == 'False', "Error should have returned 'False'")
         self.assertTrue(extract_string("hot's") == "hot's", "Error should have returned hot's")
-        self.assertTrue(extract_string("") == "", "Error should have returned ''")
+        self.assertTrue(extract_string("") is None, "Error should have returned None")
 
         values = [fNaN, True, False, 'True', 'False', 'true', 'false', 1, '1', 1.0, '1.0', None, 'None', "hot's", 'hot\\\'s']
         column_type_extractors  = [extract_boolean, extract_integer, extract_float, extract_string]

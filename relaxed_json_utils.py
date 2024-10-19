@@ -68,16 +68,21 @@ def get_detailed_type(obj):
     if isinstance(obj, pd.DataFrame):
         if len(obj) == 0:
             return "Empty DataFrame"
-        sample = obj.iloc[0]
-        if isinstance(sample, pd.Series):
-            return f"DataFrame(List[Dict])"
-        else:
-            return f"DataFrame({type(sample).__name__})"
+        
+        # Check if all column contains lists of dictionaries
+        for col in obj.columns:
+            if all(isinstance(item, dict) for item in obj[col]):
+                return "DataFrame[List(dict)]"
+        return "DataFrame"
+
     elif isinstance(obj, list):
         if not obj:
-            return "List(Empty)"
-        sample = obj[0]
-        return f"List({type(sample).__name__})"
+            return "Empty List"
+        # if all element are the same type return List of that type
+        if all(isinstance(item, (int, float, str, bool, dict, tuple)) for item in obj):
+            return f"List({type(obj[0]).__name__})"
+        else:
+            return "List[Any]"
     elif isinstance(obj, dict):
         return "Dict"
     else:

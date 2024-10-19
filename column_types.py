@@ -8,6 +8,7 @@ import pandas as pd
 
 from column_errors_logger import logger as process_columns_logger
 from thread_utils import run_with_message
+from relaxed_json_utils import read_relaxed_json, get_detailed_type
 
 fnan = fNaN = np.nan
 finf = fInf = np.inf
@@ -36,16 +37,14 @@ def p_typed_value(x):
 
 ###### ---- string functions ---- ######
 
-# get a string from the given value
-# even if the value is None, NaN, or Inf
+# get a string from the given value x
+# return None if x is empty string, None, NaN, or Inf
 def extract_string(x: Any) -> Optional[str]:
     if x is None:
-        return 'None'
+        return None
     if isinstance(x, float):
-        if np.isnan(x):
-            return 'NaN'
-        if np.isinf(x):
-            return 'Inf' if x > 0 else '-Inf'
+        if np.isnan(x) or np.isinf(x):
+            return None
     try:
         if isinstance(x, str):
             x = x.strip()
@@ -195,13 +194,13 @@ def is_numeric(s: Any) -> bool:
 
 ###### ---- object functions ---- ######
 
-# extract a list or a dict from the given string
+# extract a list of decit or a dict from the given string
 # or return None if the string has the wrong format
 # or cannot be json-parsed
 
 def extract_object(input_data: Any) -> Optional[Union[List, Dict]]:
     """
-    Extract a list or a dict from the given input_data.
+    Extract a list of dict or a dict from the given input_data.
     Return None if the string has the wrong format or cannot be parsed.
 
     Args:
@@ -226,20 +225,21 @@ def extract_object(input_data: Any) -> Optional[Union[List, Dict]]:
 
     # Try parsing as JSON
     try:
-        parsed_data = json.loads(input_data)
-        if isinstance(parsed_data, (list, dict)):
-            return parsed_data
-    except json.JSONDecodeError:
-        pass
+        parsed_data_df = read_relaxed_json(input_data)
+        details = get_detailed_type(parsed_data_df)
+        print("parsed_data_df:")
+        print(f"{parsed_data_df}")
+        print("details:")
+        print(f"{details}")
+        
+        # return a list or a dict
+        
+        return parsed_data_df
+        
+    except ValueError as e:
+        print(f"Error: {e}")
 
-    # If JSON parsing fails, try fixing common issues
-    fixed_data = input_data.replace("'", '"').replace("None", "null")
-    try:
-        parsed_data = json.loads(fixed_data)
-        if isinstance(parsed_data, (list, dict)):
-            return parsed_data
-    except json.JSONDecodeError:
-        pass
+  
 
     # If all parsing attempts fail, return None
     return None
