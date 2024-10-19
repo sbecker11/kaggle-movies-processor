@@ -1,7 +1,7 @@
 import pandas as pd
-import demjson3
 import io
 import re
+import json
 
 def advanced_preprocess(json_string):
     def replace_value(match):
@@ -49,18 +49,36 @@ def read_relaxed_json(file_or_string):
     preprocessed_data = advanced_preprocess(data)
 
     try:
-        parsed_data = demjson3.decode(preprocessed_data)
-    except demjson3.JSONDecodeError as e:
+        parsed_data = json.loads(preprocessed_data)
+        # parsed_data = demjson3.decode(preprocessed_data)
+    except json.JSONDecodeError as e:
         print(f"Error parsing JSON: {e}")
         print(f"Preprocessed data: {preprocessed_data}")
         raise
 
-    if isinstance(parsed_data, (str, int, float, bool)):
+    if isinstance(parsed_data, (str)):
+        if parsed_data.isdigit():
+            return int(parsed_data)
+        elif parsed_data.replace('.', '').isdigit():
+            return float(parsed_data)
+        elif parsed_data.lower() == 'true':
+            return True
+        elif parsed_data.lower() == 'false':
+            return False
+        elif parsed_data.lower() == 'null':
+            return None
+        elif parsed_data.startswith('"') and parsed_data.endswith('"'):
+            return parsed_data[1:-1]
+        else:
+            return parsed_data
+    if isinstance(parsed_data, (int, float, bool)):
         return parsed_data
     elif isinstance(parsed_data, dict):
-        return pd.DataFrame([parsed_data])
+        return parsed_data
     elif isinstance(parsed_data, list):
-        return pd.DataFrame(parsed_data)
+        if all(isinstance(item, dict) for item in parsed_data):
+            return parsed_data
+        return parsed_data
     else:
         return pd.DataFrame([{'value': parsed_data}])
     

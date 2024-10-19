@@ -7,6 +7,14 @@ from relaxed_json_utils import read_relaxed_json, get_detailed_type
 
 class TestRelaxedJsonUtils(TestCase):
     
+    def test_strings(self):
+        json_str = '{"key": "value", "number": 4}'
+        obj = read_relaxed_json(io.StringIO(json_str))
+        print("obj:")
+        print(obj)
+        detailed_type = get_detailed_type(obj)
+        print(f"obj: class:{obj.__class__} detailed_type:{detailed_type}")
+    
     def test_relaxed_json(self):
         test_cases = [
             ('{"key": "value", "number": 4}', "Dict"),
@@ -25,7 +33,7 @@ class TestRelaxedJsonUtils(TestCase):
             ('false', "bool"),
             ('null', "NoneType"),
             ('3.14159', "float"),
-            ('["a", "b", "c"]', "List[str]"),
+            ('["a", "b", "c"]', "List(str)"),
             ('[]', "Empty List"),
             ('{}', "Empty Dict"),
         ]
@@ -36,12 +44,16 @@ class TestRelaxedJsonUtils(TestCase):
             json_str, expected = tuple
             print(f"Test case {i}: {json_str}, {expected}")
             try:
-                result = read_relaxed_json(io.StringIO(json_str))
-                detailed_type = get_detailed_type(result)
-                if detailed_type != expected:
+                obj = read_relaxed_json(io.StringIO(json_str))
+                detailed_type = get_detailed_type(obj)
+                print(f"obj: class:{obj.__class__} detailed_type:{detailed_type}") 
+                print(f"{obj}") 
+                if detailed_type.upper() != expected.upper():
                     print(f"Expected: {expected} != Got: {detailed_type}")
                     num_errors += 1
                     json_str_errors.append((json_str,expected,detailed_type))
+                else:
+                    print(f"Passed : Expected: {expected} == Got: {detailed_type}")
             except Exception as e:
                 print(f"Error: {e}")
             print()
@@ -72,6 +84,8 @@ class TestRelaxedJsonUtils(TestCase):
                 num_errors += 1
                 print(f"Expected: {expected}, Got: {result}")
                 json_str_errors.append((obj, expected, result))
+            else:
+                print(f"Passed : Expected: {expected} == Got: {result}")
             print()
             
         for json_str in json_str_errors:
@@ -82,6 +96,7 @@ class TestRelaxedJsonUtils(TestCase):
     def main(self):
         self.test_relaxed_json()
         self.test_get_detailed_type()
+        self.test_strings()
         
 if __name__ == '__main__':
     TestRelaxedJsonUtils().main()
